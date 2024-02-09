@@ -1,0 +1,7 @@
+python-dotenv
+Flask
+numpy
+boto3
+requests
+opencv-python
+flask-cors

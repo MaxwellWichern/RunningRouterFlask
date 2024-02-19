@@ -3,7 +3,8 @@ from flask import request, jsonify
 import requests
 from main import app
 import json
-
+from collections import OrderedDict
+from functions import overpassQuery, optimizeOverpassResult, optimizeForAdjList
 
 @app.route('/')
 def home():
@@ -25,7 +26,7 @@ def getNodesAndWays():
         [out:json];
         nw(around: {}, {}, {})["highway"];
         (._;>;);
-        out geom;
+        out body;
     '''.format(radius, float(data["lat"]), float(data["lon"]))
     overPass_url = "https://overpass-api.de/api/interpreter"
     query_params = {"data": query}
@@ -37,9 +38,19 @@ def getNodesAndWays():
 @app.route("/overpassGather", methods=['POST'])
 def bundlePythonResults():
     #1 get data sent by this request, mileage/start/ other criteria
+    data = request.form
     #2 get data from overpass using #1
-    #3 send the data to the graph builder
-    #  clean data? should I try and optimize the nodes as only the intersections
-    #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm int this step)
-    #5 return routes
-    print("Hell0")
+    result = overpassQuery(data['mileage'], data['lat'], data['lon'], data['address'])
+    #  use coords to calculate distances between nodes using getDistance()
+    orderedResult = OrderedDict(result)
+    #coordNodes, adjacencyMatrixWeighted = optimizeOverpassResult(result)
+    adjList, coordArray = optimizeForAdjList(orderedResult)
+
+    # try and optimize the nodes as only the intersections, but should be passible at this point to the algorithm
+    #3 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
+    #4 return routes
+
+    #print(adjacencyMatrix.shape, file=open('output.txt', 'a'))
+    #print(list(adjacencyMatrixWeighted), file=open('output.txt', 'a'))
+    
+    return adjList

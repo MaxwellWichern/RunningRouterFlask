@@ -3,21 +3,72 @@ from math import acos, sin, cos, radians
 import numpy as np
 import threading
 import time
+import geopy.distance
 
-def overpassQuery(mileage, lat, lon, address):
+
+def fixBoundingBox(direction, lat, lon, radius):
+    bboxFixedCoords = {"minLat": 0, "maxLat": 0, "minLon": 0, "maxLon": 0}
+    if (direction == 'North'):
+        bboxFixedCoords["minLon"] = lon
+        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=0).longitude
+        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=270).latitude
+        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=90).latitude
+    elif (direction == 'East'):
+        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=180).longitude
+        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=0).longitude
+        bboxFixedCoords["minLat"] = lat
+        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=90).latitude
+    elif (direction == 'South'):
+        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=180).longitude
+        bboxFixedCoords["maxLon"] = lon
+        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=270).latitude
+        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=90).latitude
+    elif (direction == 'West'):
+        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=180).longitude
+        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=0).longitude
+        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=270).latitude
+        bboxFixedCoords["maxLat"] = lat
+    elif (direction == 'North-East'):
+        topRight = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=45)
+        bboxFixedCoords["minLon"] = lon
+        bboxFixedCoords["maxLon"] = topRight.longitude
+        bboxFixedCoords["minLat"] = lat
+        bboxFixedCoords["maxLat"] = topRight.latitude
+    elif (direction == 'South-East'):
+        bottomRight = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=135)
+        bboxFixedCoords["minLon"] = bottomRight.longitude
+        bboxFixedCoords["maxLon"] = lon
+        bboxFixedCoords["minLat"] = lat
+        bboxFixedCoords["maxLat"] = bottomRight.latitude
+    elif (direction == 'South-West'):
+        bottomLeft = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=225)
+        bboxFixedCoords["minLon"] = bottomLeft.longitude
+        bboxFixedCoords["maxLon"] = lon
+        bboxFixedCoords["minLat"] = bottomLeft.latitude
+        bboxFixedCoords["maxLat"] = lat
+    elif (direction == 'North-West'):
+        bottomLeft = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=315)
+        bboxFixedCoords["minLon"] = lon
+        bboxFixedCoords["maxLon"] = bottomLeft.longitude
+        bboxFixedCoords["minLat"] = bottomLeft.latitude
+        bboxFixedCoords["maxLat"] = lat
+
+    return bboxFixedCoords
+
+def overpassQuery(mileage, lat, lon, address, direction, roadList):
     radius = 1609.344 * float(mileage)/2.0
     if (address != "NULL"):
         location = True #temp data
         # geocode to get coords, else just use lat and lon
-    #[out:json];
+    if direction:
+        coordsForBBox = fixBoundingBox(direction, lat, lon, radius)
+        bboxString = '[bbox: {}, {}, {}, {}];'.format(coordsForBBox["minLat"],coordsForBBox["minLon"], coordsForBBox["maxLat"], coordsForBBox["maxLon"])
     query = '''
-        [out:json];
         (
             way(around: {0}, {1}, {2})["highway"="residential"];
             way(around: {0}, {1}, {2})["highway"="secondary"];
             way(around: {0}, {1}, {2})["highway"="tertiary"];
             way(around: {0}, {1}, {2})["highway"="unclassified"];
-            //way(around: 1000, 44.8755, -91.9351)["highway"="path"];
         );
         (._;>;);
         out body;
@@ -155,6 +206,7 @@ def wayThreadProcess(start, end, jsonObject, coordArray, adjList, mutex):
         if (element["id"] == end):
             localStart = True
         if localStart:
+            roadType = element["tags"]["highway"]
             previousNode = -1
             #go through every node inside the way
             for node in element["nodes"]:
@@ -172,20 +224,20 @@ def wayThreadProcess(start, end, jsonObject, coordArray, adjList, mutex):
                             coordArray.append(el)
                             #the first element of a dict will be its location in coordArray
                             #if previousNode == -1:
-                            adjList[str(node)] = [len(coordArray)-1]
+                            adjList[str(node)] = {'coordArrayId': len(coordArray)-1, 'adjacencies': []}
                             
                         else: newNode = False
                         #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
-                        adjList[str(node)].append(coordArray[previousNode])
+                        adjList[str(node)]['adjacencies'].append({'nodeId': str(coordArray[previousNode]["id"]), 'connectedBy': roadType})
                         idOfLast = coordArray[previousNode]["id"]
-                        adjList[str(idOfLast)].append(el)
+                        adjList[str(idOfLast)]['adjacencies'].append({'nodeId': str(el["id"]), 'connectedBy': roadType})
                         
                         #if this was a new node
                         if newNode:
                             previousNode = len(coordArray)-1
                         #otherwise we want it to be the node at the old location
                         else:
-                            previousNode = adjList[str(node)][0]
+                            previousNode = adjList[str(node)]['coordArrayId']
                         mutex.release()
                         break
         #TODO I do not believe the very last way is included unfortunately

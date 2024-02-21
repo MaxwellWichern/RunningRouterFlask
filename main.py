@@ -9,4 +9,4 @@ from runningRouteApp import bp as runner_bp
 app.register_blueprint(runner_bp)
 
 if __name__ == "__main__":
-    app.run(debug = True)
+    app.run(debug=True)

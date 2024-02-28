@@ -232,7 +232,7 @@ def optimizeForAdjList(jsonObject):
             wayCount = count - ssiCounter
             firstWayIndex = ssiCounter
 
-        #with the waycount found determine the correct locations
+        #with the total way count found, determine the correct locations of each start and stop for each thread
         if firstWayBool:
             if (ssiCounter == len(jsonObject["elements"])-1):
                 if (len(startStopIds) == threadCount):
@@ -256,10 +256,13 @@ def optimizeForAdjList(jsonObject):
 
     return adjList, coordArray
 
-#get the distance in kilometers between two coordinates
-
     
-#the process each thread will address
+#the process each thread will run, taking in the following parameters:
+# start and stop id for the threading
+# the json object to go through
+# the coordArray for which nodes will be inserted
+# the adjacency list for which adjacency data; road type, weight, adjacent node, will be added
+# mutex, the mutual exclusion object to prevent deadlocks and race conditions
 def wayThreadProcess(start, end, jsonObject, coordArray, adjList, mutex):
      #go through every way
     localStart = False

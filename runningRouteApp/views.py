@@ -7,14 +7,17 @@ from collections import OrderedDict
 from functions import overpassQuery, optimizeOverpassResult, optimizeForAdjList
 from geopy import distance
 
+#tutorial default route
 @app.route('/')
 def home():
     return "Hello world!"
 
+#tutorial route to print a name
 @app.route('/hello/<name>', methods=['GET'])
 def user(name):
     return f"Hello {name}!"
 
+#testing getting the start location within a region to check it is valid
 @app.route('/startTesting', methods=['POST'])
 def testGetCorrectStart():
     data = request.form
@@ -61,6 +64,7 @@ def testGetCorrectStart():
 
     return minNode
 
+#test query to get data from overpass
 @app.route("/test", methods=['POST'])
 def getNodesAndWays():
     data = request.form
@@ -82,6 +86,8 @@ def getNodesAndWays():
     print(json.dumps(result, indent=2))
     return result
 
+#current main query, begins by getting data from overpass, it turns it into an orderedDict, and then 
+#turns the data into an adjacency list to be used for the algorithm
 @app.route("/overpassGather", methods=['POST'])
 def bundlePythonResults():
     #1 get data sent by this request, mileage/start/ other criteria

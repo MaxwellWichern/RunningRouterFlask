@@ -14,6 +14,12 @@ def home():
 def user(name):
     return f"Hello {name}!"
 
+@app.route('/startRoute', methods=['POST'])
+def startRoute():
+    data = request.form
+    print(data["start"])
+    return data["start"]
+
 @app.route("/test", methods=['POST'])
 def getNodesAndWays():
     data = request.form
@@ -34,6 +40,25 @@ def getNodesAndWays():
     result = response.json()
     print(json.dumps(result, indent=2))
     return result
+
+@app.route("/overpassGatherStart", methods=['POST'])
+def bundlePythonResults():
+    #1 get data sent by this request, mileage/start/ other criteria
+    data = request.form
+    #2 get data from overpass using #1
+    result = overpassQuery(data['mileage'], data['lat'], data['lon'], data['address'], data['direction'], data['roadList'])
+    #  use coords to calculate distances between nodes using getDistance()
+    orderedResult = OrderedDict(result)
+    #coordNodes, adjacencyMatrixWeighted = optimizeOverpassResult(result)
+    #adjList, coordArray = optimizeForAdjList(orderedResult)
+    #print(coordArray)
+    #3 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
+    #4 return routes
+
+    #print(adjacencyMatrix.shape, file=open('output.txt', 'a'))
+    #print(list(adjacencyMatrixWeighted), file=open('output.txt', 'a'))
+    
+    return orderedResult
 
 @app.route("/overpassGather", methods=['POST'])
 def bundlePythonResults():

@@ -22,3 +22,7 @@ While within the virtual environment, to installed python packages run:
 To start the flask app use the following command.
 
                     flask --app main run
+                
+This does not start in debug mode, to run in debug mode, run the following command after activating the .venv:
+
+                    py main.py

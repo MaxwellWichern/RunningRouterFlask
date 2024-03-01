@@ -9,3 +9,4 @@ numpy
 requests
 opencv-python
 flask-cors
+geopy

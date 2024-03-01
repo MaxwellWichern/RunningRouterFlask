@@ -5,65 +5,126 @@ import threading
 import time
 import geopy.distance
 
+#This function fixes the bounding box around the start location to help limit the number of nodes as well as add a neat utility to the user
+#Parameters include
+# direction: (North, South, East, West, North-East, North-West, South-East, South-West)
+# lat: latitude positioning in Decimal Degrees
+# lon: longitude positioning in Decimal Degrees
+# distMile: The distance in miles
+def fixBoundingBox(direction, lat, lon, distMile):
 
-def fixBoundingBox(direction, lat, lon, radius):
-    bboxFixedCoords = {"minLat": 0, "maxLat": 0, "minLon": 0, "maxLon": 0}
+    bboxFixedCoords = {"minLat": 0, "minLon": 0, "maxLat": 0, "maxLon": 0}
     if (direction == 'North'):
         bboxFixedCoords["minLon"] = lon
-        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=0).longitude
-        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=270).latitude
-        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=90).latitude
+        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).longitude
+        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).latitude
+        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).latitude
     elif (direction == 'East'):
-        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=180).longitude
-        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=0).longitude
+        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=270).longitude
+        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).longitude
         bboxFixedCoords["minLat"] = lat
-        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=90).latitude
+        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).latitude
     elif (direction == 'South'):
-        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=180).longitude
+        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=270).longitude
         bboxFixedCoords["maxLon"] = lon
-        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=270).latitude
-        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=90).latitude
+        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).latitude
+        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).latitude
     elif (direction == 'West'):
-        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=180).longitude
-        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=0).longitude
-        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=270).latitude
+        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=270).longitude
+        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).longitude
+        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).latitude
         bboxFixedCoords["maxLat"] = lat
     elif (direction == 'North-East'):
-        topRight = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=45)
+        topRight = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=45)
         bboxFixedCoords["minLon"] = lon
         bboxFixedCoords["maxLon"] = topRight.longitude
         bboxFixedCoords["minLat"] = lat
         bboxFixedCoords["maxLat"] = topRight.latitude
     elif (direction == 'South-East'):
-        bottomRight = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=135)
+        bottomRight = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=135)
         bboxFixedCoords["minLon"] = bottomRight.longitude
         bboxFixedCoords["maxLon"] = lon
         bboxFixedCoords["minLat"] = lat
         bboxFixedCoords["maxLat"] = bottomRight.latitude
     elif (direction == 'South-West'):
-        bottomLeft = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=225)
+        bottomLeft = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=225)
         bboxFixedCoords["minLon"] = bottomLeft.longitude
         bboxFixedCoords["maxLon"] = lon
         bboxFixedCoords["minLat"] = bottomLeft.latitude
         bboxFixedCoords["maxLat"] = lat
     elif (direction == 'North-West'):
-        bottomLeft = geopy.distance.distance(miles=radius).destination(geopy.Point(lat,lon), bearing=315)
+        bottomLeft = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=315)
         bboxFixedCoords["minLon"] = lon
         bboxFixedCoords["maxLon"] = bottomLeft.longitude
         bboxFixedCoords["minLat"] = bottomLeft.latitude
         bboxFixedCoords["maxLat"] = lat
-
+    else:
+        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).longitude
+        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).longitude
+        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=270).latitude
+        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).latitude
+    bboxFixedCoords["minLon"] = int(bboxFixedCoords["minLon"] * 10000000)/10000000
+    bboxFixedCoords["maxLon"] = int(bboxFixedCoords["maxLon"] * 10000000)/10000000
+    bboxFixedCoords["minLat"] = int(bboxFixedCoords["minLat"] * 10000000)/10000000
+    bboxFixedCoords["maxLat"] = int(bboxFixedCoords["maxLat"] * 10000000)/10000000
     return bboxFixedCoords
 
-def overpassQuery(mileage, lat, lon, address, direction, roadList):
+# when the user queries to generate a route, the start point might not correspond with a node on a highway tag,
+# so find the nearest one and start there
+def findCheckStart(lat, lon):
+    meters = 20
+    min = 3200
+    while meters/2 < 3200 and min == 1000:
+        query = '''
+            [out:json];
+
+            //Get all nodes around 80 meters of the coordinates and asign it to the output set .aroundnodes
+            node(around:{},{}, {})->.aroundnodes;
+
+            //get the ways using the input set aroundnodes, but bn is backward, then it filters highways of the specific tag. This uses a regular expression denoted by the ~, then ^ is start, $ is end, and the | is for or
+            way(bn.aroundnodes)[highway~"^(residential|primary|secondary|tertiary|unclassified)$"]->.allways;
+
+            //this finds the nodes of all ways and puts them into waynodes
+            node(w.allways)->.waynodes;
+
+            //union
+            (
+                //combines both sets of nodes into one set
+                node.waynodes.aroundnodes; 
+            );
+
+            //prints the previous set put into the default set ._
+            out body;
+        '''.format(meters, float(lat), float(lon))
+
+        overPass_url = "https://overpass-api.de/api/interpreter"
+        query_params = {"data": query}
+        response = requests.post(overPass_url, data=query_params)
+        result = response.json()
+
+        minNode = None
+        for node in result['elements']:
+            tempD = geopy.distance.distance((lat, lon), (node['lat'], node['lon']))
+            if tempD < min: 
+                min = tempD
+                minNode = node
+        meters *= 2
+
+    if minNode is None: return False
+    return minNode["lat"], minNode["lon"] 
+        
+
+#This is the first method called to begin the route gen, specifically finding all the nodes and ways located in the area selected
+def overpassQuery(mileage, lat, lon, direction):
     radius = 1609.344 * float(mileage)/2.0
-    if (address != "NULL"):
-        location = True #temp data
-        # geocode to get coords, else just use lat and lon
-    if direction:
-        coordsForBBox = fixBoundingBox(direction, lat, lon, radius)
-        bboxString = '[bbox: {}, {}, {}, {}];'.format(coordsForBBox["minLat"],coordsForBBox["minLon"], coordsForBBox["maxLat"], coordsForBBox["maxLon"])
+    try:
+        lat, lon = findCheckStart(lat, lon)
+    except:
+        return "Start point not within 2 mile area, recommended to find a new start"
+    coordsForBBox = fixBoundingBox(direction, float(lat), float(lon), float(mileage)/2)
+    bboxString = '[bbox: {}, {}, {}, {}]'.format(coordsForBBox["minLat"],coordsForBBox["minLon"], coordsForBBox["maxLat"], coordsForBBox["maxLon"])
     query = '''
+        [out:json]{3};
         (
             way(around: {0}, {1}, {2})["highway"="residential"];
             way(around: {0}, {1}, {2})["highway"="secondary"];
@@ -72,7 +133,7 @@ def overpassQuery(mileage, lat, lon, address, direction, roadList):
         );
         (._;>;);
         out body;
-    '''.format(radius, float(lat), float(lon))
+    '''.format(radius, float(lat), float(lon), bboxString)
     #overPass_url = "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
     overPass_url = "https://overpass-api.de/api/interpreter"
     query_params = {"data": query}
@@ -82,7 +143,7 @@ def overpassQuery(mileage, lat, lon, address, direction, roadList):
     return result
 
 
-#forgoing distance until the matrix can be built
+#the matrix builds, but this is very inefficient going directly to a matrix
 def optimizeOverpassResult(jsonObject):
     coordArray = list()
     adjacency_Matrix = np.zeros((1,1))
@@ -148,6 +209,7 @@ def optimizeOverpassResult(jsonObject):
 
     return coordArray, adjacency_Matrix
 
+#Create an adjacency list from the given object/dict received from the overpass query
 def optimizeForAdjList(jsonObject):
     adjList = dict()
     coordArray = list()
@@ -170,7 +232,7 @@ def optimizeForAdjList(jsonObject):
             wayCount = count - ssiCounter
             firstWayIndex = ssiCounter
 
-        #with the waycount found determine the correct locations
+        #with the total way count found, determine the correct locations of each start and stop for each thread
         if firstWayBool:
             if (ssiCounter == len(jsonObject["elements"])-1):
                 if (len(startStopIds) == threadCount):
@@ -182,7 +244,7 @@ def optimizeForAdjList(jsonObject):
                 startStopIds.append(element["id"])
     
 
-    print(startStopIds)
+    #print(startStopIds)
     #multithreading the process of converting to an adjacency list
     for x in range(0, threadCount):
         thread = threading.Thread(target=wayThreadProcess, args=(startStopIds[x], startStopIds[x+1],jsonObject, coordArray, adjList, mutex))
@@ -194,11 +256,13 @@ def optimizeForAdjList(jsonObject):
 
     return adjList, coordArray
 
-#get the distance in kilometers between two coordinates
-def getDistance(lat1, lon1, lat2, lon2):
-    return acos(sin(radians(lat1))*sin(radians(lat2))+cos(radians(lat1))*cos(radians(lat2))*cos(radians(lon2-lon1)))*6371
     
-#the process each thread will address
+#the process each thread will run, taking in the following parameters:
+# start and stop id for the threading
+# the json object to go through
+# the coordArray for which nodes will be inserted
+# the adjacency list for which adjacency data; road type, weight, adjacent node, will be added
+# mutex, the mutual exclusion object to prevent deadlocks and race conditions
 def wayThreadProcess(start, end, jsonObject, coordArray, adjList, mutex):
      #go through every way
     localStart = False
@@ -227,10 +291,20 @@ def wayThreadProcess(start, end, jsonObject, coordArray, adjList, mutex):
                             adjList[str(node)] = {'coordArrayId': len(coordArray)-1, 'adjacencies': []}
                             
                         else: newNode = False
+
+                        #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
+                        lat1 = coordArray[adjList[str(node)]['coordArrayId']]['lat']
+                        lon1 = coordArray[adjList[str(node)]['coordArrayId']]['lon']
+                        lat2 = coordArray[previousNode]['lat']
+                        lon2 = coordArray[previousNode]['lon']
+                        #in meters from miles
+                        #distanceToNode = int(1609.344 * geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100) / 100
+                        #in miles
+                        distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 10000) / 10000   
                         #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
-                        adjList[str(node)]['adjacencies'].append({'nodeId': str(coordArray[previousNode]["id"]), 'connectedBy': roadType})
+                        adjList[str(node)]['adjacencies'].append({'nodeId': str(coordArray[previousNode]["id"]), 'connectedBy': roadType, 'weightMeters': distanceToNode})
                         idOfLast = coordArray[previousNode]["id"]
-                        adjList[str(idOfLast)]['adjacencies'].append({'nodeId': str(el["id"]), 'connectedBy': roadType})
+                        adjList[str(idOfLast)]['adjacencies'].append({'nodeId': str(el["id"]), 'connectedBy': roadType, 'weightMeters': distanceToNode})
                         
                         #if this was a new node
                         if newNode:
@@ -240,9 +314,6 @@ def wayThreadProcess(start, end, jsonObject, coordArray, adjList, mutex):
                             previousNode = adjList[str(node)]['coordArrayId']
                         mutex.release()
                         break
-        #TODO I do not believe the very last way is included unfortunately
-        #The thread Ids are [start,stop), but does that really matter?
-        #end of thread interval, leave 
         if element["id"] == start:
             break
 

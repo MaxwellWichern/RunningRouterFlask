@@ -59,10 +59,10 @@ def fixBoundingBox(direction, lat, lon, distMile):
         bboxFixedCoords["minLat"] = bottomLeft.latitude
         bboxFixedCoords["maxLat"] = lat
     else:
-        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).longitude
-        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).longitude
-        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=270).latitude
-        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).latitude
+        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=270).longitude
+        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).longitude
+        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).latitude
+        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).latitude
     bboxFixedCoords["minLon"] = int(bboxFixedCoords["minLon"] * 10000000)/10000000
     bboxFixedCoords["maxLon"] = int(bboxFixedCoords["maxLon"] * 10000000)/10000000
     bboxFixedCoords["minLat"] = int(bboxFixedCoords["minLat"] * 10000000)/10000000
@@ -74,7 +74,7 @@ def fixBoundingBox(direction, lat, lon, distMile):
 def findCheckStart(lat, lon):
     meters = 20
     min = 3200
-    while meters/2 < 3200 and min == 1000:
+    while meters/2 < 3200 and min == 3200:
         query = '''
             [out:json];
 
@@ -244,7 +244,7 @@ def optimizeForAdjList(jsonObject):
                 startStopIds.append(element["id"])
     
 
-    #print(startStopIds)
+    print(startStopIds)
     #multithreading the process of converting to an adjacency list
     for x in range(0, threadCount):
         thread = threading.Thread(target=wayThreadProcess, args=(startStopIds[x], startStopIds[x+1],jsonObject, coordArray, adjList, mutex))

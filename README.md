@@ -4,6 +4,9 @@ Run the following command to create a python virtual environment.
                     
                     py -3 -m venv .venv
 
+If this command (py -3 -m venv .venv) does not work run
+                    python -m venv .venv
+
 To start the virtual environment run this command.
 
                     .venv\scripts\activate
@@ -19,3 +22,7 @@ While within the virtual environment, to installed python packages run:
 To start the flask app use the following command.
 
                     flask --app main run
+                
+This does not start in debug mode, to run in debug mode, run the following command after activating the .venv:
+
+                    py main.py

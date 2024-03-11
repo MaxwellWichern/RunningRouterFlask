@@ -1,9 +1,12 @@
 import requests, json
 from math import acos, sin, cos, radians
 import numpy as np
-import threading
+#import threading
 import time
 import geopy.distance
+from multiprocessing import Lock, Process
+from multiprocessing.pool import ThreadPool
+import threading
 
 #This function fixes the bounding box around the start location to help limit the number of nodes as well as add a neat utility to the user
 #Parameters include
@@ -210,13 +213,100 @@ def optimizeOverpassResult(jsonObject):
     return coordArray, adjacency_Matrix
 
 #Create an adjacency list from the given object/dict received from the overpass query
-def optimizeForAdjList(jsonObject):
+def optimizeForAdjListMulti(orderedDict, num):
+    adjList = dict()
+    coordArray = list()
+    mutex = Lock()
+    pool = ThreadPool()
+    dictToList = orderedDict["elements"]
+    numWorkers = num
+    wayList = []
+    nodeList = []
+    for element in dictToList:
+        if element["type"] == 'node':
+            nodeList.append(element)
+        else:
+            wayList.append(element)
+    
+    interval_size = int(len(wayList)/numWorkers)
+    
+    processes = []
+    for x in range(num):
+        processes.append(Process(target=multiProcessTwo, args=(wayList[x * interval_size: (x+1)* interval_size], nodeList, coordArray, adjList, mutex)))
+        
+    for process in processes:
+        process.start()
+
+    for process in processes:
+        process.join()
+
+    #async_workers = [
+      #  pool.apply_async(wayMultiProcess, args=(wayList[i * interval_size: (i+1)* interval_size], nodeList, coordArray, adjList, mutex,)) 
+     #   for i in range(numWorkers)
+    #]
+    #pool.close()
+    #pool.join()
+    return adjList, coordArray
+
+    
+#the process each thread will run, taking in the following parameters:
+# start and stop id for the threading
+# the json object to go through
+# the coordArray for which nodes will be inserted
+# the adjacency list for which adjacency data; road type, weight, adjacent node, will be added
+# mutex, the mutual exclusion object to prevent deadlocks and race conditions
+def wayMultiProcess(wayList, nodeList, coordArray, adjList, mutex):
+     #go through every way
+    for element in wayList:
+        roadType = element["tags"]["highway"]
+        previousNode = -1
+        #go through every node inside the way
+        for node in element["nodes"]:
+            #search for the actual node corresponding to the id of the 'node' variable above
+            for el in nodeList:
+                #if the type is not node, it is a way, just skip out. It is an arbitrary spot usually roughly half, where it switches
+                #but it is not set in stone at any one time
+                if el["type"] != "node": break
+                if el["id"] == node:
+                    newNode = True
+                    #if the node is new, add a new element to the dict and add an adjacency from previous to it and it to previous
+                    
+                    if node not in adjList:
+                        with mutex:
+                            coordArray.append(el)
+                            #the first element of a dict will be its location in coordArray
+                            adjList[node] = [len(coordArray)-1, []]
+                    else: newNode = False
+
+                    #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
+                    lat1 = coordArray[adjList[node][0]]['lat']
+                    lon1 = coordArray[adjList[node][0]]['lon']
+                    lat2 = coordArray[previousNode]['lat']
+                    lon2 = coordArray[previousNode]['lon']
+
+                    distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 10000) / 10000   
+                    #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
+                    with mutex:
+                        adjList[node][1].append([coordArray[previousNode]["id"], distanceToNode])
+                        idOfLast = coordArray[previousNode]["id"]
+                        adjList[idOfLast][1].append([el["id"], distanceToNode])
+                        
+                    
+                    #if this was a new node
+                    if newNode:
+                        previousNode = len(coordArray)-1
+                    #otherwise we want it to be the node at the old location
+                    else:
+                        previousNode = adjList[node][0]
+                    break
+
+def optimizeForAdjListThread(jsonObject, num):
     adjList = dict()
     coordArray = list()
     mutex = threading.Lock()
     threads = []
 
-    threadCount = 5
+    threadCount = num
 
     #total count
     count = len([element for element in jsonObject["elements"]])
@@ -247,7 +337,7 @@ def optimizeForAdjList(jsonObject):
     #print(startStopIds)
     #multithreading the process of converting to an adjacency list
     for x in range(0, threadCount):
-        thread = threading.Thread(target=wayThreadProcess, args=(startStopIds[x], startStopIds[x+1],jsonObject, coordArray, adjList, mutex))
+        thread = threading.Thread(target=wayThreadProcess, args=(startStopIds[x], startStopIds[x+1],jsonObject["elements"], coordArray, adjList, mutex))
         threads.append(thread)
     for thread in threads:
         thread.start()
@@ -266,7 +356,7 @@ def optimizeForAdjList(jsonObject):
 def wayThreadProcess(start, end, jsonObject, coordArray, adjList, mutex):
      #go through every way
     localStart = False
-    for element in reversed(jsonObject["elements"]):
+    for element in reversed(jsonObject):
         if (element["id"] == end):
             localStart = True
         if localStart:
@@ -275,7 +365,7 @@ def wayThreadProcess(start, end, jsonObject, coordArray, adjList, mutex):
             #go through every node inside the way
             for node in element["nodes"]:
                 #search for the actual node corresponding to the id of the 'node' variable above
-                for el in jsonObject["elements"]:
+                for el in jsonObject:
                     #if the type is not node, it is a way, just skip out. It is an arbitrary spot usually roughly half, where it switches
                     #but it is not set in stone at any one time
                     if el["type"] != "node": break
@@ -283,18 +373,18 @@ def wayThreadProcess(start, end, jsonObject, coordArray, adjList, mutex):
                         newNode = True
                         #if the node is new, add a new element to the dict and add an adjacency from previous to it and it to previous
                         mutex.acquire()
-                        if str(node) not in adjList:  
+                        if node not in adjList:  
                             #print(node)          
                             coordArray.append(el)
                             #the first element of a dict will be its location in coordArray
                             #if previousNode == -1:
-                            adjList[str(node)] = {'coordArrayId': len(coordArray)-1, 'adjacencies': []}
+                            adjList[node] = [len(coordArray)-1, []]
                             
                         else: newNode = False
 
                         #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
-                        lat1 = coordArray[adjList[str(node)]['coordArrayId']]['lat']
-                        lon1 = coordArray[adjList[str(node)]['coordArrayId']]['lon']
+                        lat1 = coordArray[adjList[node][0]]['lat']
+                        lon1 = coordArray[adjList[node][0]]['lon']
                         lat2 = coordArray[previousNode]['lat']
                         lon2 = coordArray[previousNode]['lon']
                         #in meters from miles
@@ -302,18 +392,66 @@ def wayThreadProcess(start, end, jsonObject, coordArray, adjList, mutex):
                         #in miles
                         distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 10000) / 10000   
                         #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
-                        adjList[str(node)]['adjacencies'].append({'nodeId': str(coordArray[previousNode]["id"]), 'connectedBy': roadType, 'weightMeters': distanceToNode})
+                        adjList[node][1].append([coordArray[previousNode]["id"], distanceToNode])
                         idOfLast = coordArray[previousNode]["id"]
-                        adjList[str(idOfLast)]['adjacencies'].append({'nodeId': str(el["id"]), 'connectedBy': roadType, 'weightMeters': distanceToNode})
+                        adjList[idOfLast][1].append([el["id"],distanceToNode])
                         
                         #if this was a new node
                         if newNode:
                             previousNode = len(coordArray)-1
                         #otherwise we want it to be the node at the old location
                         else:
-                            previousNode = adjList[str(node)]['coordArrayId']
+                            previousNode = adjList[node][0]
                         mutex.release()
                         break
         if element["id"] == start:
             break
 
+def multiProcessTwo(wayList, nodeList, coordArray, adjList, mutex):
+     #go through every way
+    for element in wayList:
+        roadType = element["tags"]["highway"]
+        previousNode = -1
+        #go through every node inside the way
+        for node in element["nodes"]:
+            #search for the actual node corresponding to the id of the 'node' variable above
+            for el in nodeList:
+                #if the type is not node, it is a way, just skip out. It is an arbitrary spot usually roughly half, where it switches
+                #but it is not set in stone at any one time
+                if el["type"] != "node": break
+                if el["id"] == node:
+                    newNode = True
+                    #if the node is new, add a new element to the dict and add an adjacency from previous to it and it to previous
+                    mutex.acquire()
+                    if node not in adjList:  
+                        #print(node)          
+                        coordArray.append(el)
+                        #the first element of a dict will be its location in coordArray
+                        #if previousNode == -1:
+                        adjList[node] = [len(coordArray)-1, []]
+                    
+                    else: newNode = False
+                    mutex.release()
+                    #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
+                    lat1 = coordArray[adjList[node][0]]['lat']
+                    lon1 = coordArray[adjList[node][0]]['lon']
+                    lat2 = coordArray[previousNode]['lat']
+                    lon2 = coordArray[previousNode]['lon']
+                    #in meters from miles
+                    #distanceToNode = int(1609.344 * geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100) / 100
+                    #in miles
+                    distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 10000) / 10000   
+                    #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
+                    mutex.acquire()
+                    adjList[node][1].append([coordArray[previousNode]["id"], distanceToNode])
+                    idOfLast = coordArray[previousNode]["id"]
+                    adjList[idOfLast][1].append([el["id"],distanceToNode])
+                    mutex.release()
+                    
+                    #if this was a new node
+                    if newNode:
+                        previousNode = len(coordArray)-1
+                    #otherwise we want it to be the node at the old location
+                    else:
+                        previousNode = adjList[node][0]
+                    break

@@ -4,8 +4,11 @@ import requests
 from main import app
 import json
 from collections import OrderedDict
-from functions import overpassQuery, optimizeOverpassResult, optimizeForAdjList
+from functions import overpassQuery, optimizeOverpassResult, optimizeForAdjListMulti,optimizeForAdjListThread
 from geopy import distance
+from time import time, sleep
+import multiprocessing as mp
+
 
 #tutorial default route
 @app.route('/')
@@ -100,7 +103,27 @@ def bundlePythonResults():
     except:
         return result
     #coordNodes, adjacencyMatrixWeighted = optimizeOverpassResult(result)
-    adjList, coordArray = optimizeForAdjList(orderedResult)
+    numWorkers = mp.cpu_count()
+    #start = time()
+    #adjList, coordArray = optimizeForAdjListMulti(orderedResult, 1)
+    #finish = time()-start
+    #print("SingleProcess: ", finish)
+    #sleep(3)
+    start = time()
+    adjList, coordArray = optimizeForAdjListMulti(orderedResult, numWorkers)
+    finish = time()-start
+    print("multiProcess: ",numWorkers," -> ", finish)
+    #sleep(3)
+    #start = time()
+    #adjList, coordArray = optimizeForAdjListThread(orderedResult, 1)
+    #finish = time()-start
+    #print("single Thread: ", finish)
+    #sleep(3)
+    #start = time()
+    #adjList, coordArray = optimizeForAdjListThread(orderedResult, 4)
+    #finish = time()-start
+    #print("multi thread: ", finish)
+
     #3 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
     
     #4 return routes

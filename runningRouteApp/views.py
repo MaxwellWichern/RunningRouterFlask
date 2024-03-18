@@ -4,7 +4,7 @@ import requests
 from main import app
 import json
 from collections import OrderedDict
-from functions import overpassQuery, optimizeOverpassResult, optimizeForAdjListMulti,optimizeForAdjListThread
+from functions import overpassQuery, optimizeForAdjListMulti, createAdjListThreadless
 from geopy import distance
 from time import time, sleep
 import multiprocessing as mp
@@ -102,33 +102,18 @@ def bundlePythonResults():
         orderedResult = OrderedDict(result)
     except:
         return result
-    #coordNodes, adjacencyMatrixWeighted = optimizeOverpassResult(result)
-    numWorkers = mp.cpu_count()
-    #start = time()
-    #adjList, coordArray = optimizeForAdjListMulti(orderedResult, 1)
+    
+    #numWorkers = mp.cpu_count()
+    #tart = time()
+    #adjList, coordArray = optimizeForAdjListMulti(orderedResult, 2)
     #finish = time()-start
-    #print("SingleProcess: ", finish)
-    #sleep(3)
+    #print("Time: ", finish)
     start = time()
-    adjList, coordArray = optimizeForAdjListMulti(orderedResult, numWorkers)
+    adjList, coordArray = createAdjListThreadless(orderedResult)
     finish = time()-start
-    print("multiProcess: ",numWorkers," -> ", finish)
-    #sleep(3)
-    #start = time()
-    #adjList, coordArray = optimizeForAdjListThread(orderedResult, 1)
-    #finish = time()-start
-    #print("single Thread: ", finish)
-    #sleep(3)
-    #start = time()
-    #adjList, coordArray = optimizeForAdjListThread(orderedResult, 4)
-    #finish = time()-start
-    #print("multi thread: ", finish)
-
+    print("Time: ", finish)
     #3 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
     
     #4 return routes
-
-    #print(adjacencyMatrix.shape, file=open('output.txt', 'a'))
-    #print(list(adjacencyMatrixWeighted), file=open('output.txt', 'a'))
     
     return adjList

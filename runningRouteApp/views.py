@@ -7,7 +7,6 @@ from collections import OrderedDict
 from functions import overpassQuery, optimizeForAdjListMulti, createAdjListThreadless
 from geopy import distance
 from time import time, sleep
-import multiprocessing as mp
 from geopy.geocoders import Nominatim
 
 

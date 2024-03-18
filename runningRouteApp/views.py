@@ -4,9 +4,12 @@ import requests
 from main import app
 import json
 from collections import OrderedDict
-from functions import overpassQuery, optimizeOverpassResult, optimizeForAdjList
+from functions import overpassQuery, optimizeForAdjListMulti, createAdjListThreadless
 from geopy import distance
+from time import time, sleep
+import multiprocessing as mp
 from geopy.geocoders import Nominatim
+
 
 #tutorial default route
 @app.route('/')
@@ -110,13 +113,19 @@ def bundlePythonResults():
         orderedResult = OrderedDict(result)
     except:
         return result
-    #coordNodes, adjacencyMatrixWeighted = optimizeOverpassResult(result)
-    adjList, coordArray = optimizeForAdjList(orderedResult)
+    
+    #numWorkers = mp.cpu_count()
+    #tart = time()
+    #adjList, coordArray = optimizeForAdjListMulti(orderedResult, 2)
+    #finish = time()-start
+    #print("Time: ", finish)
+    start = time()
+    adjList, coordArray = createAdjListThreadless(orderedResult)
+    finish = time()-start
+    print("Time: ", finish)
     #3 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
     
     #4 return routes
+    
+    return adjList
 
-    #print(adjacencyMatrix.shape, file=open('output.txt', 'a'))
-    #print(list(adjacencyMatrixWeighted), file=open('output.txt', 'a'))
-    print("Got here")
-    return coordArray

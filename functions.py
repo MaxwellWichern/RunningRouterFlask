@@ -1,9 +1,10 @@
 import requests, json
-from math import acos, sin, cos, radians
-import numpy as np
-import threading
-import time
 import geopy.distance
+from multiprocessing import Lock, Process
+import multiprocessing
+from threading import Semaphore
+
+
 
 #This function fixes the bounding box around the start location to help limit the number of nodes as well as add a neat utility to the user
 #Parameters include
@@ -14,25 +15,17 @@ import geopy.distance
 def fixBoundingBox(direction, lat, lon, distMile):
 
     bboxFixedCoords = {"minLat": 0, "minLon": 0, "maxLat": 0, "maxLon": 0}
+    bboxFixedCoords["minLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=270).longitude
+    bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).longitude
+    bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).latitude
+    bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).latitude
     if (direction == 'North'):
         bboxFixedCoords["minLon"] = lon
-        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).longitude
-        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).latitude
-        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).latitude
     elif (direction == 'East'):
-        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=270).longitude
-        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).longitude
         bboxFixedCoords["minLat"] = lat
-        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).latitude
     elif (direction == 'South'):
-        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=270).longitude
         bboxFixedCoords["maxLon"] = lon
-        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).latitude
-        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).latitude
     elif (direction == 'West'):
-        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=270).longitude
-        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).longitude
-        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).latitude
         bboxFixedCoords["maxLat"] = lat
     elif (direction == 'North-East'):
         topRight = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=45)
@@ -59,10 +52,10 @@ def fixBoundingBox(direction, lat, lon, distMile):
         bboxFixedCoords["minLat"] = bottomLeft.latitude
         bboxFixedCoords["maxLat"] = lat
     else:
-        bboxFixedCoords["minLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=270).longitude
-        bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).longitude
-        bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).latitude
-        bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).latitude
+        #throw an error
+        print("")
+    
+    #fix the coordinates to have 7 decimals, arbitrarily chosen
     bboxFixedCoords["minLon"] = int(bboxFixedCoords["minLon"] * 10000000)/10000000
     bboxFixedCoords["maxLon"] = int(bboxFixedCoords["maxLon"] * 10000000)/10000000
     bboxFixedCoords["minLat"] = int(bboxFixedCoords["minLat"] * 10000000)/10000000
@@ -70,11 +63,14 @@ def fixBoundingBox(direction, lat, lon, distMile):
     return bboxFixedCoords
 
 # when the user queries to generate a route, the start point might not correspond with a node on a highway tag,
-# so find the nearest one and start there
-def findCheckStart(lat, lon):
+# so this finds the nearest coordinate that will be within the area
+#lat: latitude
+#lon: longitude
+#mileage: distance goal, but in this case it is used as the vicinity to check around
+def findCheckStart(lat, lon, mileage):
     meters = 20
-    min = 3200
-    while meters/2 < 3200 and min == 3200:
+    min = mileage
+    while meters/2 < min and min == mileage:
         query = '''
             [out:json];
 
@@ -102,6 +98,7 @@ def findCheckStart(lat, lon):
         response = requests.post(overPass_url, data=query_params)
         result = response.json()
 
+        #finds the distance of the nodes that were found if any, the closest one is set as the start and returns
         minNode = None
         for node in result['elements']:
             tempD = geopy.distance.distance((lat, lon), (node['lat'], node['lon']))
@@ -115,13 +112,22 @@ def findCheckStart(lat, lon):
         
 
 #This is the first method called to begin the route gen, specifically finding all the nodes and ways located in the area selected
+#mileage: the mileage goal for the route
+#lat: latitude
+#lon: longitude
+#direction: direction is of the form North, East, South, West, North-East, North-West, South-East, South-West
+#-----------This is used to limit the bounding box in the query to help prevent excess data
 def overpassQuery(mileage, lat, lon, direction):
+    #find the start location
     radius = 1609.344 * float(mileage)/2.0
     try:
-        lat, lon = findCheckStart(lat, lon)
+        lat, lon = findCheckStart(lat, lon, radius)
     except:
         return "Start point not within 2 mile area, recommended to find a new start"
+    print(lat, lon)
+    #fix the bounding box
     coordsForBBox = fixBoundingBox(direction, float(lat), float(lon), float(mileage)/2)
+    print(coordsForBBox)
     bboxString = '[bbox: {}, {}, {}, {}]'.format(coordsForBBox["minLat"],coordsForBBox["minLon"], coordsForBBox["maxLat"], coordsForBBox["maxLon"])
     query = '''
         [out:json]{3};
@@ -130,190 +136,155 @@ def overpassQuery(mileage, lat, lon, direction):
             way(around: {0}, {1}, {2})["highway"="secondary"];
             way(around: {0}, {1}, {2})["highway"="tertiary"];
             way(around: {0}, {1}, {2})["highway"="unclassified"];
+            way(around: {0}, {1}, {2})["highway"="primary"];
         );
         (._;>;);
         out body;
     '''.format(radius, float(lat), float(lon), bboxString)
-    #overPass_url = "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
     overPass_url = "https://overpass-api.de/api/interpreter"
     query_params = {"data": query}
+    #This is the actual query using the data above
     response = requests.post(overPass_url, data=query_params)
     result = response.json()
     #print(json.dumps(result, indent=2))
     return result
 
 
-#the matrix builds, but this is very inefficient going directly to a matrix
-def optimizeOverpassResult(jsonObject):
-    coordArray = list()
-    adjacency_Matrix = np.zeros((1,1))
-
-    first = True
-    for element in reversed(jsonObject['elements']):
-        if (element['type'] == 'way'):
-            #print(element)
-            if (first):
-                print(element)
-            previousNode = -1
-            #go through every node inside the way
-            for node in element["nodes"]:
-                # (next two lines) Search for the corresponding node in the elements list from the json
-                for el in jsonObject['elements']:
-                    if el["type"] != "node": break
-                    if el["id"] == node:
-                        #check if the id is in coordArray already, 
-                        newEl = True
-                        idx = 0 #pre initializing idx outside of the loops so they aren't local variables to those blocks
-                        for count, newNode in enumerate(coordArray):
-                            #print("NewNode") 
-                            #print(newNode)
-                            if (newNode[0] == node):
-                                #if node is not new, idx is equal to the index of the corresponding node in coordArray
-                                idx = count
-                                #print(count)
-                                newEl = False
-
-                        #print("")
-                        #if the node is new, add one 1 to N in the NxN matrix and insert to coordArray
-                        if newEl:
-                            #print("This was a new node")
-                            coordArray.append([node, el["lat"], el["lon"]])
-                            if (not first):
-                                rows, cols = adjacency_Matrix.shape
-                                #print(adjacency_Matrix)
-                                A = np.zeros((rows+1, cols+1))
-                                #print(A)
-                                A[:rows, :cols] = adjacency_Matrix
-                                #print(A)
-                                adjacency_Matrix = A
-                            #index of this element is rows+1 in the coordArray
-                            idx = len(coordArray)-1
-                            
-                        #all the time
-                        #print("last Node: " + str(previousNode) + ",\n This node: " + str(idx))
-                        if (previousNode != -1):
-                            coordDist = getDistance(coordArray[previousNode][1], coordArray[previousNode][2], coordArray[idx][1], coordArray[idx][2])
-                            adjacency_Matrix[previousNode,idx] = coordDist
-                            adjacency_Matrix[idx, previousNode] = coordDist
-                        
-                        #print(adjacency_Matrix)
-                        previousNode = idx
-                        first = False
-                        break
-        else:
-            break
-        
-    #for count, coords in enumerate(coordArray):
-     #   if (count < len(coordArray)-1):
-      #     coordArray[count].insert(1,getDistance(coords[0], coords[1], coordArray[count+1][0], coordArray[count+1][1]))
-
-    return coordArray, adjacency_Matrix
-
 #Create an adjacency list from the given object/dict received from the overpass query
-def optimizeForAdjList(jsonObject):
-    adjList = dict()
-    coordArray = list()
-    mutex = threading.Lock()
-    threads = []
-
-    threadCount = 4
-
-    #total count
-    count = len([element for element in jsonObject["elements"]])
-    startStopIds = []
-    firstWayIndex = 0
-    firstWayBool = False
-    wayCount = 0
-    #find start and stop thread ids
-    for ssiCounter, element in enumerate(jsonObject["elements"]):
-        #find the count of way elements that i want to thread through
-        if element["type"] == "way" and not firstWayBool:
-            firstWayBool = True
-            wayCount = count - ssiCounter
-            firstWayIndex = ssiCounter
-
-        #with the total way count found, determine the correct locations of each start and stop for each thread
-        if firstWayBool:
-            if (ssiCounter == len(jsonObject["elements"])-1):
-                if (len(startStopIds) == threadCount):
-                    startStopIds.append(element["id"])
-                else:
-                    startStopIds[len(startStopIds)-1] = element["id"]
-                break
-            if ((ssiCounter-firstWayIndex) % max(1, wayCount//threadCount) == 0):
-                startStopIds.append(element["id"])
+#orderedDict: The dictionary recieved with the nodes and the ways from overpass
+#num: the number of workers/processes being created
+def optimizeForAdjListMulti(orderedDict, num):
+    adjList = multiprocessing.Manager().dict()
+    coordArray = multiprocessing.Manager().list()
+    sp = multiprocessing.Manager().Semaphore(1)
+    dictToList = orderedDict["elements"]
+    wayList = []
+    nodeList = []
+    for element in dictToList:
+        if element["type"] == 'node':
+            nodeList.append(element)
+        else:
+            wayList.append(element)
     
-
-    print(startStopIds)
-    #multithreading the process of converting to an adjacency list
-    for x in range(0, threadCount):
-        thread = threading.Thread(target=wayThreadProcess, args=(startStopIds[x], startStopIds[x+1],jsonObject, coordArray, adjList, mutex))
-        threads.append(thread)
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-
-    return adjList, coordArray
-
+    interval_size = int(len(wayList)/num)
     
-#the process each thread will run, taking in the following parameters:
-# start and stop id for the threading
-# the json object to go through
-# the coordArray for which nodes will be inserted
-# the adjacency list for which adjacency data; road type, weight, adjacent node, will be added
-# mutex, the mutual exclusion object to prevent deadlocks and race conditions
-def wayThreadProcess(start, end, jsonObject, coordArray, adjList, mutex):
+    processes = []
+    for x in range(0, num):
+        newP = Process(target=multiProcessTwo, args=(wayList[x * interval_size: (x+1)* interval_size], nodeList, coordArray, adjList, sp))
+        newP.start()
+        processes.append(newP)
+
+    for process in processes:
+        process.join()
+
+
+    return dict(adjList), list(coordArray)
+
+#the target process in the multiprocessing, this will create the adjacency list
+#waylist: The list of ways from the overpass query
+#nodelist: the list of nodes from the overpass query
+#coordArray: The coordinate array will house all the nodes only once with the lats and lons
+#------------The index of each element is used to navigate the adjacency List
+#adjList: The adjacency list being created, the first element is the coordinate location in the coord array
+#---------and the second is the list of adjacencies in the form of coordArray index, weight
+def multiProcessTwo(wayList, nodeList, coordArray, adjList, sp):
      #go through every way
-    localStart = False
-    for element in reversed(jsonObject["elements"]):
-        if (element["id"] == end):
-            localStart = True
-        if localStart:
-            roadType = element["tags"]["highway"]
-            previousNode = -1
-            #go through every node inside the way
-            for node in element["nodes"]:
-                #search for the actual node corresponding to the id of the 'node' variable above
-                for el in jsonObject["elements"]:
-                    #if the type is not node, it is a way, just skip out. It is an arbitrary spot usually roughly half, where it switches
-                    #but it is not set in stone at any one time
-                    if el["type"] != "node": break
-                    if el["id"] == node:
-                        newNode = True
-                        #if the node is new, add a new element to the dict and add an adjacency from previous to it and it to previous
-                        mutex.acquire()
-                        if str(node) not in adjList:  
+    localAdjList = dict()
+    for element in wayList:
+        roadType = element["tags"]["highway"]
+        previousNode = -1
+        #go through every node inside the way
+        for node in element["nodes"]:
+            #search for the actual node corresponding to the id of the 'node' variable above
+            for el in nodeList:
+                #if the type is not node, it is a way, just skip out. It is an arbitrary spot usually roughly half, where it switches
+                #but it is not set in stone at any one time
+                if el["type"] != "node": break
+                if el["id"] == node:
+                    newNode = True
+                    #if the node is new, add a new element to the dict and add an adjacency from previous to it and it to previous
+                    sp.acquire()
+                    try:
+                        if node not in adjList:  
                             #print(node)          
                             coordArray.append(el)
-                            #the first element of a dict will be its location in coordArray
-                            #if previousNode == -1:
-                            adjList[str(node)] = {'coordArrayId': len(coordArray)-1, 'adjacencies': []}
-                            
+                            #the first element will be its location in coordArray
+                            adjList[node] = [len(coordArray)-1, []]
+                        
                         else: newNode = False
-
                         #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
-                        lat1 = coordArray[adjList[str(node)]['coordArrayId']]['lat']
-                        lon1 = coordArray[adjList[str(node)]['coordArrayId']]['lon']
+                        if previousNode != -1:
+                            lat1 = coordArray[adjList[node][0]]['lat']
+                            lon1 = coordArray[adjList[node][0]]['lon']
+                            lat2 = coordArray[previousNode]['lat']
+                            lon2 = coordArray[previousNode]['lon']
+                            #in miles
+                            distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
+                            #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
+                            adjList[node][1].append([coordArray[previousNode]["id"], distanceToNode])
+                            idOfLast = coordArray[previousNode]["id"]
+                            adjList[idOfLast][1].append([el["id"],distanceToNode])
+                    except:
+                        print("Error adding adjacencies:")
+                        print(el)
+                        print(coordArray[len(coordArray)-1])
+                    finally:
+                        sp.release()
+                    
+                    #if this was a new node
+                    if newNode:
+                        previousNode = len(coordArray)-1
+                    #otherwise we want it to be the node at the old location
+                    else:
+                        previousNode = adjList[node][0]
+                    break
+
+def createAdjListThreadless(orderedDict):
+    adjList = dict()
+    coordArray = list()
+    dictToList = orderedDict["elements"]
+
+    #go through every way
+    for element in reversed(dictToList):
+        if element["type"] == "node": break
+        roadType = element["tags"]["highway"]
+        previousNode = -1
+        #go through every node inside the way
+        for node in element["nodes"]:
+            #search for the actual node corresponding to the id of the 'node' variable above
+            for el in dictToList:
+                #if the type is not node, it is a way, just skip out. It is an arbitrary spot usually roughly half, where it switches
+                #but it is not set in stone at any one time
+                if el["type"] != "node": break
+                if el["id"] == node:
+                    newNode = True
+                    #if the node is new, add a new element to the dict and add an adjacency from previous to it and it to previous
+                    if node not in adjList:  
+                        #print(node)          
+                        coordArray.append(el)
+                        #the first element will be its location in coordArray
+                        adjList[node] = [len(coordArray)-1, []]
+                    
+                    else: newNode = False
+                    #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
+                    if previousNode != -1:
+                        lat1 = coordArray[adjList[node][0]]['lat']
+                        lon1 = coordArray[adjList[node][0]]['lon']
                         lat2 = coordArray[previousNode]['lat']
                         lon2 = coordArray[previousNode]['lon']
-                        #in meters from miles
-                        #distanceToNode = int(1609.344 * geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100) / 100
                         #in miles
-                        distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 10000) / 10000   
+                        distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
                         #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
-                        adjList[str(node)]['adjacencies'].append({'nodeId': str(coordArray[previousNode]["id"]), 'connectedBy': roadType, 'weightMeters': distanceToNode})
+                        adjList[node][1].append([coordArray[previousNode]["id"], distanceToNode])
                         idOfLast = coordArray[previousNode]["id"]
-                        adjList[str(idOfLast)]['adjacencies'].append({'nodeId': str(el["id"]), 'connectedBy': roadType, 'weightMeters': distanceToNode})
-                        
-                        #if this was a new node
-                        if newNode:
-                            previousNode = len(coordArray)-1
-                        #otherwise we want it to be the node at the old location
-                        else:
-                            previousNode = adjList[str(node)]['coordArrayId']
-                        mutex.release()
-                        break
-        if element["id"] == start:
-            break
+                        adjList[idOfLast][1].append([el["id"],distanceToNode])
+                
+                    #if this was a new node
+                    if newNode:
+                        previousNode = len(coordArray)-1
+                    #otherwise we want it to be the node at the old location
+                    else:
+                        previousNode = adjList[node][0]
+                    break
 
+    return adjList, coordArray

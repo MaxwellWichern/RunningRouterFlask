@@ -4,6 +4,9 @@ Run the following command to create a python virtual environment.
                     
                     py -3 -m venv .venv
 
+If this command (py -3 -m venv .venv) does not work run
+                    python -m venv .venv
+
 To start the virtual environment run this command.
 
                     .venv\scripts\activate

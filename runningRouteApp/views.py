@@ -8,6 +8,7 @@ from functions import overpassQuery, optimizeForAdjListMulti, createAdjListThrea
 from geopy import distance
 from time import time, sleep
 import multiprocessing as mp
+from geopy.geocoders import Nominatim
 
 
 #tutorial default route
@@ -19,6 +20,16 @@ def home():
 @app.route('/hello/<name>', methods=['GET'])
 def user(name):
     return f"Hello {name}!"
+
+# Getting coordinates from an address
+@app.route('/getCoordinates', methods=['POST'])
+def getCoordinatesFromAddress():
+    geolocator = Nominatim(user_agent="RunningApp")
+    data = request.form
+    address = data['address']
+    location = geolocator.geocode(address)
+    print((location.latitude, location.longitude))
+    return [location.latitude, location.longitude]
 
 #testing getting the start location within a region to check it is valid
 @app.route('/startTesting', methods=['POST'])
@@ -117,3 +128,4 @@ def bundlePythonResults():
     #4 return routes
     
     return adjList
+

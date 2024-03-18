@@ -177,6 +177,7 @@ def optimizeForAdjListMulti(orderedDict, num):
     for process in processes:
         process.join()
 
+
     return dict(adjList), list(coordArray)
 
 #the target process in the multiprocessing, this will create the adjacency list

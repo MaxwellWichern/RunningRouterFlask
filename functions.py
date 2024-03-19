@@ -3,7 +3,7 @@ import geopy.distance
 from multiprocessing import Lock, Process
 import multiprocessing
 from threading import Semaphore
-
+from math import sqrt
 
 
 #This function fixes the bounding box around the start location to help limit the number of nodes as well as add a neat utility to the user
@@ -28,38 +28,38 @@ def fixBoundingBox(direction, lat, lon, distMile):
     elif (direction == 'West'):
         bboxFixedCoords["maxLat"] = lat
     elif (direction == 'North-East'):
-        topRight = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=45)
+        topRight = geopy.distance.distance(miles=sqrt(2*distMile*distMile)).destination(geopy.Point(lat,lon), bearing=45)
         bboxFixedCoords["minLon"] = lon
         bboxFixedCoords["maxLon"] = topRight.longitude
         bboxFixedCoords["minLat"] = lat
         bboxFixedCoords["maxLat"] = topRight.latitude
     elif (direction == 'South-East'):
-        bottomRight = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=135)
+        bottomRight = geopy.distance.distance(miles=sqrt(2*distMile*distMile)).destination(geopy.Point(lat,lon), bearing=135)
         bboxFixedCoords["minLon"] = bottomRight.longitude
         bboxFixedCoords["maxLon"] = lon
         bboxFixedCoords["minLat"] = lat
         bboxFixedCoords["maxLat"] = bottomRight.latitude
     elif (direction == 'South-West'):
-        bottomLeft = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=225)
+        bottomLeft = geopy.distance.distance(miles=sqrt(2*distMile*distMile)).destination(geopy.Point(lat,lon), bearing=225)
         bboxFixedCoords["minLon"] = bottomLeft.longitude
         bboxFixedCoords["maxLon"] = lon
         bboxFixedCoords["minLat"] = bottomLeft.latitude
         bboxFixedCoords["maxLat"] = lat
     elif (direction == 'North-West'):
-        bottomLeft = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=315)
+        topLeft = geopy.distance.distance(miles=sqrt(2*distMile*distMile)).destination(geopy.Point(lat,lon), bearing=315)        
         bboxFixedCoords["minLon"] = lon
-        bboxFixedCoords["maxLon"] = bottomLeft.longitude
-        bboxFixedCoords["minLat"] = bottomLeft.latitude
+        bboxFixedCoords["maxLon"] = topLeft.longitude
+        bboxFixedCoords["minLat"] = topLeft.latitude
         bboxFixedCoords["maxLat"] = lat
     else:
         #throw an error
         print("")
     
     #fix the coordinates to have 7 decimals, arbitrarily chosen
-    bboxFixedCoords["minLon"] = int(bboxFixedCoords["minLon"] * 10000000)/10000000
-    bboxFixedCoords["maxLon"] = int(bboxFixedCoords["maxLon"] * 10000000)/10000000
-    bboxFixedCoords["minLat"] = int(bboxFixedCoords["minLat"] * 10000000)/10000000
-    bboxFixedCoords["maxLat"] = int(bboxFixedCoords["maxLat"] * 10000000)/10000000
+    bboxFixedCoords["minLon"] = int(bboxFixedCoords["minLon"] * 10000)/10000
+    bboxFixedCoords["maxLon"] = int(bboxFixedCoords["maxLon"] * 10000)/10000
+    bboxFixedCoords["minLat"] = int(bboxFixedCoords["minLat"] * 10000)/10000
+    bboxFixedCoords["maxLat"] = int(bboxFixedCoords["maxLat"] * 10000)/10000
     return bboxFixedCoords
 
 # when the user queries to generate a route, the start point might not correspond with a node on a highway tag,

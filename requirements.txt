@@ -10,3 +10,6 @@ requests
 opencv-python
 flask-cors
 geopy
+bson
+pymongo[srv]
+Flask-PyMongo

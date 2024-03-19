@@ -24,3 +24,20 @@ def get_db():
 
 # Use LocalProxy to read the global db instance with just `db`
 db = LocalProxy(get_db)
+
+def getAdjList(email):
+    """
+    Retrieves the adjacency list from mongodb using the field:
+    - 'email'; retrieved via login and being sent in process with the request
+    """
+    list = db.adjacencyLists.find_one({'email': email})
+    return list
+
+def addAdjList():
+    print("adding the adjacency list to mongo")
+
+def updateAdjList():
+    print("Changing the Adjacency list")
+
+def deleteAdjList():
+    print("Deleting the adjList")

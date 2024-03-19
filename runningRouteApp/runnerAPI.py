@@ -1,27 +1,31 @@
 from flask import Flask
 from flask import request, jsonify
 import requests
-from main import app
 import json
 from collections import OrderedDict
-from functions import overpassQuery, optimizeForAdjListMulti, createAdjListThreadless
+from runningRouteApp.overpassAlgInit import overpassQuery, optimizeForAdjListMulti, createAdjListThreadless
 from geopy import distance
-from time import time, sleep
+from time import time
 from geopy.geocoders import Nominatim
+from flask import Blueprint
+from flask_cors import CORS
+from db import getAdjList, addAdjList, updateAdjList, deleteAdjList
 
+runnerBP = Blueprint('runner', __name__, template_folder='templates')
+CORS(runnerBP)
 
 #tutorial default route
-@app.route('/')
+@runnerBP.route('/')
 def home():
     return "Hello world!"
 
 #tutorial route to print a name
-@app.route('/hello/<name>', methods=['GET'])
+@runnerBP.route('/hello/<name>', methods=['GET'])
 def user(name):
     return f"Hello {name}!"
 
 # Getting coordinates from an address
-@app.route('/getCoordinates', methods=['POST'])
+@runnerBP.route('/getCoordinates', methods=['POST'])
 def getCoordinatesFromAddress():
     geolocator = Nominatim(user_agent="RunningApp")
     data = request.form
@@ -31,7 +35,7 @@ def getCoordinatesFromAddress():
     return [location.latitude, location.longitude]
 
 #testing getting the start location within a region to check it is valid
-@app.route('/startTesting', methods=['POST'])
+@runnerBP.route('/startTesting', methods=['POST'])
 def testGetCorrectStart():
     data = request.form
     meters = 20
@@ -78,7 +82,7 @@ def testGetCorrectStart():
     return minNode
 
 #test query to get data from overpass
-@app.route("/test", methods=['POST'])
+@runnerBP.route("/test", methods=['POST'])
 def getNodesAndWays():
     data = request.form
     radius = 1609.344 * float(data["mileage"])/2.0
@@ -101,11 +105,24 @@ def getNodesAndWays():
 
 #current main query, begins by getting data from overpass, it turns it into an orderedDict, and then 
 #turns the data into an adjacency list to be used for the algorithm
-@app.route("/overpassGather", methods=['POST'])
+@runnerBP.route("/overpassGather", methods=['POST'])
 def bundlePythonResults():
-    #1 get data sent by this request, mileage/start/ other criteria
+    #1 get data sent by this request, mileage/lat/lon/direction/ "user info"
     data = request.form
-    #2 get data from overpass using #1
+
+    #2 check if we need to create a new adjacency list
+        #2.1 if the request is not provided with an email, the user is not logged in, skip this because we need to save data with an email
+    
+        #2.2 get the saved adjacency_list. If it doesn't exist, we can skip and go to 3 to create it
+    
+        #2.3 if it exists, we have our start node from the data element and we will have saved the start node with the list in mongodb to simplify this step
+        #----We can find the distance between these two points, if the distance is greater than the mileage, we definitely need one
+    
+        #2.4 another concern is the same start node but different distance. if the distance is larger, we need a new list, otherwise it is okay and we can reuse it
+    
+        #2.5 update the TTL/date for the list
+    
+    #3.1 if we need a new list get data from overpass using #1
     result = overpassQuery(data['mileage'], data['lat'], data['lon'], data['direction'])
     #  use coords to calculate distances between nodes using getDistance()
     try:
@@ -113,6 +130,7 @@ def bundlePythonResults():
     except:
         return result
     
+    #3.2 create the adjacency list and corresponding coordinate array which has latitude and longitude
     #numWorkers = mp.cpu_count()
     #tart = time()
     #adjList, coordArray = optimizeForAdjListMulti(orderedResult, 2)
@@ -122,9 +140,10 @@ def bundlePythonResults():
     adjList, coordArray = createAdjListThreadless(orderedResult)
     finish = time()-start
     print("Time: ", finish)
-    #3 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
+    #3.3 add the new adjacency list to mongo, replacing the old list and add the TTL date for the element
+
+    #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
     
-    #4 return routes
-    
-    return adjList
+    #5 return routes
+    return jsonify(adjList)
 

@@ -239,6 +239,14 @@ def multiProcessTwo(wayList, nodeList, coordArray, adjList, sp):
                         previousNode = adjList[node][0]
                     break
 
+#The threadless implementation of converting data to an adjacency list
+#Threadless was chosen due to python's GIL and the overhead due to multiprocessing
+#multiprocessing has the potential to be used when finding multiple routes because they
+#will not have to share resources between processes
+#orderedDict: This is the dictionary provided by overpass
+#-------------I only care about the ["elements"], in which the format of those is
+#-------------a list of nodes with coordinates followed by a list of ways which house a list of nodeIds, 
+#-------------searchable only from the above nodes
 def createAdjListThreadless(orderedDict):
     adjList = dict()
     coordArray = list()

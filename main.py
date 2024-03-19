@@ -1,6 +1,6 @@
 import configparser
 import os
-from factory import create_app
+from runningRouteApp.factory import create_app
 
 config = configparser.ConfigParser()
 config.read(os.path.abspath(os.path.join(".ini")))

@@ -209,7 +209,7 @@ def multiProcessTwo(wayList, nodeList, coordArray, adjList, sp):
                             #print(node)          
                             coordArray.append(el)
                             #the first element will be its location in coordArray
-                            adjList[node] = [len(coordArray)-1, []]
+                            adjList[node] = [len(coordArray)-1]
                         
                         else: newNode = False
                         #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
@@ -221,9 +221,9 @@ def multiProcessTwo(wayList, nodeList, coordArray, adjList, sp):
                             #in miles
                             distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
                             #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
-                            adjList[node][1].append([coordArray[previousNode]["id"], distanceToNode])
+                            adjList[node].append([coordArray[previousNode]["id"], distanceToNode])
                             idOfLast = coordArray[previousNode]["id"]
-                            adjList[idOfLast][1].append([el["id"],distanceToNode])
+                            adjList[idOfLast].append([el["id"],distanceToNode])
                     except:
                         print("Error adding adjacencies:")
                         print(el)
@@ -271,7 +271,7 @@ def createAdjListThreadless(orderedDict):
                         #print(node)          
                         coordArray.append(el)
                         #the first element will be its location in coordArray
-                        adjList[node] = [len(coordArray)-1, []]
+                        adjList[node] = [len(coordArray)-1]
                     
                     else: newNode = False
                     #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
@@ -283,9 +283,9 @@ def createAdjListThreadless(orderedDict):
                         #in miles
                         distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
                         #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
-                        adjList[node][1].append([coordArray[previousNode]["id"], distanceToNode])
+                        adjList[node].append([coordArray[previousNode]["id"], distanceToNode])
                         idOfLast = coordArray[previousNode]["id"]
-                        adjList[idOfLast][1].append([el["id"],distanceToNode])
+                        adjList[idOfLast].append([el["id"],distanceToNode])
                 
                     #if this was a new node
                     if newNode:

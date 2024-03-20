@@ -3,6 +3,9 @@ from flask.json import JSONEncoder
 from bson import json_util, ObjectId
 from datetime import datetime
 from flask import Flask, render_template
+from configparser import ConfigParser
+
+
 
 from .runnerAPI import runnerBP as runner_bp
 
@@ -17,8 +20,10 @@ class MongoJsonEncoder(JSONEncoder):
 def create_app():
     app = Flask(__name__)
     CORS(app)
-    #create another blueprint with mongo CRUD
     app.json_encoder = MongoJsonEncoder
     app.register_blueprint(runner_bp)
+    configurer = ConfigParser()
+    configurer.read('pymongo_ini')
+    app.config['MONGO_URI'] = configurer['PROD']['DB_URI']
 
     return app

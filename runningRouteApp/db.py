@@ -1,13 +1,10 @@
 import bson
-
+from json import dumps
 from flask import current_app, g
 from werkzeug.local import LocalProxy
 from flask_pymongo import PyMongo
 
-from pymongo.errors import DuplicateKeyError, OperationFailure
-from bson.objectid import ObjectId
-from bson.errors import InvalidId
-
+from datetime import datetime, timezone
 
 def get_db():
     """
@@ -16,28 +13,65 @@ def get_db():
     db = getattr(g, "_database", None)
 
     if db is None:
-
-        db = g._database = PyMongo(current_app).db
+        mongo = PyMongo(current_app).cx['main']
+        db = g._database = mongo.db
        
     return db
 
 
 # Use LocalProxy to read the global db instance with just `db`
-db = LocalProxy(get_db)
+db = LocalProxy(lambda: get_db())
 
+
+#Retrieves the adjacency list from mongodb using the field:
+#- 'email'; retrieved via login and being sent in process with the request
 def getAdjList(email):
-    """
-    Retrieves the adjacency list from mongodb using the field:
-    - 'email'; retrieved via login and being sent in process with the request
-    """
     list = db.adjacencyLists.find_one({'email': email})
     return list
 
-def addAdjList():
-    print("adding the adjacency list to mongo")
+#add a new adjacency list
+def addAdjList(email, list, center, radius, coordArray):
+    currList = getAdjList(email)
+    if currList:
+        print("Duplicate Email")
+        return False
+    newList = {"email": email,"list": dumps(list), "createdAt": datetime.now(timezone.utc), "center": center, "radius": radius, "coordArray": coordArray}
+    success = False
+    try:
+        db.adjacencyLists.insert_one(newList)
+        success = True
+    except Exception as e:
+        print("Error on the insert: ", e)
+    return success
 
-def updateAdjList():
-    print("Changing the Adjacency list")
+#update an adjacency list if the user email already has an existing list
+def updateAdjListFull(email, list, center, radius, coordArray):
+    
+    try:
+        response = db.adjacencyLists.update_one(
+            {"email": email},
+            {"$set": {"list": dumps(list), "createdAt": datetime.now(timezone.utc), "center": center, "radius": radius, "coordArray": coordArray}},
+            upsert = True
+        )
+        return response
+    except Exception as e:
+        print("Error: ", e)
+        return None
+    
+def updateAdjListTTL(email):
+    
+    try:
+        response = db.adjacencyLists.update_one(
+            {"email": email},
+            {"$set": {"createdAt": datetime.now(timezone.utc)}}
+        )
+        return response
+    except Exception as e:
+        print("Error: ", e)
+        return None
 
-def deleteAdjList():
-    print("Deleting the adjList")
+#delete an adjacency list (I dont think I will see this because I will overwrite or rely on TTL)
+def deleteAdjList(email):
+    response = db.adjacencyLists.delete_one({"email": email})
+
+    return response

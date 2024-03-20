@@ -72,6 +72,10 @@ def updateAdjListTTL(email):
 
 #delete an adjacency list (I dont think I will see this because I will overwrite or rely on TTL)
 def deleteAdjList(email):
-    response = db.adjacencyLists.delete_one({"email": email})
+    try:
+        response = db.adjacencyLists.delete_one({"email": email})
+    except Exception as e:
+        print("Error Deleting List from Mongo: ", e)
+        return None
 
     return response

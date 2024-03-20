@@ -3,6 +3,7 @@ import requests
 import json
 from collections import OrderedDict
 from runningRouteApp.overpassAlgInit import overpassQuery, optimizeForAdjListMulti, createAdjListThreadless
+from runningRouteApp.aStarAlg import searchRunner
 from geopy import distance
 from time import time
 from geopy.geocoders import Nominatim
@@ -145,8 +146,10 @@ def bundlePythonResults():
         else: newNeeded = True
         
     #3.1 if we need a new list get data from overpass using #1
+    lat = data["lat"]
+    lon = data["lon"]
     if newNeeded:
-        result = overpassQuery(data['mileage'], data['lat'], data['lon'], data['direction'])
+        result, lat, lon = overpassQuery(data['mileage'], lat, lon, data['direction'])
         #  use coords to calculate distances between nodes using getDistance()
         try:
             orderedResult = OrderedDict(result)
@@ -168,7 +171,8 @@ def bundlePythonResults():
             print("Error adding Element, check the form data")
             print(e)
     #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
-    
+    #list, startnode, goal node, length, n->the number of times to repeat while increasing mutate chance
+    path, length = searchRunner(adjList, , , data["mileage"], 15)
     #5 return routes
     
     return jsonify(adjList)

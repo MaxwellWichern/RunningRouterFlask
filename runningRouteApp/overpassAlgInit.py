@@ -147,7 +147,7 @@ def overpassQuery(mileage, lat, lon, direction):
     response = requests.post(overPass_url, data=query_params)
     result = response.json()
     #print(json.dumps(result, indent=2))
-    return result
+    return result, lat, lon
 
 
 #Create an adjacency list from the given object/dict received from the overpass query

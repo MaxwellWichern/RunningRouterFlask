@@ -1,4 +1,3 @@
-from flask import Flask
 from flask import request, jsonify
 import requests
 import json
@@ -10,7 +9,6 @@ from geopy.geocoders import Nominatim
 from flask import Blueprint
 from flask_cors import CORS
 from runningRouteApp.db import getAdjList, addAdjList, updateAdjListFull, updateAdjListTTL, deleteAdjList
-from datetime import datetime, timezone
 
 
 runnerBP = Blueprint('runner', __name__, template_folder='templates')
@@ -133,11 +131,11 @@ def bundlePythonResults():
             lat = existingList["center"][0]
             lon = existingList["center"][1]
             distanceToNode = int(distance.distance((lat, lon), (data['lat'], data['lon'])).miles * 100000) / 100000
-            if distanceToNode > float(data["mileage"]): newNeeded = True
+            if distanceToNode > float(data["mileage"])/2: newNeeded = True
             
             #2.4 another concern is the same start node but different distance. if the distance is larger, we need a new list, otherwise it is okay and we can reuse it
             else:
-                if float(data["mileage"]) > float(existingList["radius"]): newNeeded = True
+                if float(data["mileage"])/2 > float(existingList["radius"]): newNeeded = True
                 #2.5 update the TTL/date for the list
                 else:
                     adjList = json.loads(existingList["list"])
@@ -156,11 +154,6 @@ def bundlePythonResults():
             return result
         
         #3.2 create the adjacency list and corresponding coordinate array which has latitude and longitude
-        #numWorkers = mp.cpu_count()
-        #tart = time()
-        #adjList, coordArray = optimizeForAdjListMulti(orderedResult, 2)
-        #finish = time()-start
-        #print("Time: ", finish)
         start = time()
         adjList, coordArray = createAdjListThreadless(orderedResult)
         finish = time()-start

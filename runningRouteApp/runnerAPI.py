@@ -116,6 +116,7 @@ def getLists():
 #turns the data into an adjacency list to be used for the algorithm
 @runnerBP.route("/overpassGather", methods=['POST'])
 def bundlePythonResults():
+    print("Bundle Query")
     #1 get data sent by this request, mileage/lat/lon/direction/ "user info"
     data = request.form
     newNeeded = False
@@ -127,6 +128,7 @@ def bundlePythonResults():
     if data["email"]:
         #print(datetime.now(timezone.utc))
         #2.2 get the saved adjacency_list. If it doesn't exist, we can skip and go to 3 to create it
+        print("Mongo Query: GET")
         existingList = getAdjList(data["email"])
         if existingList:
             #2.3 if it exists, we have our start node from the data element and we will have saved the start node with the list in mongodb to simplify this step
@@ -146,6 +148,7 @@ def bundlePythonResults():
                 #2.5 update the TTL/date for the list
                 else:
                     adjList = json.loads(existingList["list"])
+                    print("Mongo Query: update TTL")
                     updateAdjListTTL(data["email"])
                     
             
@@ -155,6 +158,7 @@ def bundlePythonResults():
         
     #3.1 if we need a new list get data from overpass using #1
     if newNeeded:
+        print("Query Overpass")
         result, lat, lon = overpassQuery(data['mileage'], lat, lon, data['direction'])
         #  use coords to calculate distances between nodes using getDistance()
         try:
@@ -163,6 +167,7 @@ def bundlePythonResults():
             return result
         
         #3.2 create the adjacency list and corresponding coordinate array which has latitude and longitude
+        print("Convert to adjacency list")
         start = time()
         adjList, coordArray = createAdjListThreadless(orderedResult)
         finish = time()-start
@@ -170,20 +175,28 @@ def bundlePythonResults():
         #3.3 add the new adjacency list to mongo, replacing the old list and add the TTL date for the element
         try:
             if not data["email"]:
+                print("Mongo Query: Add")
                 addAdjList(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray)
             else:
+                print("Mongo Query: update full")
                 updateAdjListFull(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray)
         except Exception as e:
             print("Error adding Element, check the form data")
             print(e)
     #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
     #list, startnode, goal node, length, n->the number of times to repeat while increasing mutate chance
+    print("find start id")
     startid = findIdFromLatLon(lat,lon)
     #this nex line finds the id of the first adjacent node
     endid = adjList[startid][1][0]
-    path, length = searchRunner(adjList, endid, startid, data["mileage"], 15)
+    print(endid)
+    print("Begin finding path")
+    path, length = searchRunner(adjList, endid, startid, data["mileage"], 30, 0.5)
     #5 return routes
-    
-    return path, length
+    coordListPath = []
+    for nodeId in path:
+        coordListPath.append([coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]])
+        print('{},{},red,square,"Pune"'.format(coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]), file=open('output.txt', 'w'))
+    return jsonify({"Path": coordListPath, "Length": length})
 
 

@@ -121,13 +121,13 @@ def overpassQuery(mileage, lat, lon, direction):
     #find the start location
     radius = 1609.344 * float(mileage)/2.0
     try:
+        print("Find correct start")
         lat, lon = findCheckStart(lat, lon, radius)
     except:
         return "Start point not within 2 mile area, recommended to find a new start"
-    print(lat, lon)
     #fix the bounding box
+    print("Fix bounding box")
     coordsForBBox = fixBoundingBox(direction, float(lat), float(lon), float(mileage)/2)
-    print(coordsForBBox)
     bboxString = '[bbox: {}, {}, {}, {}]'.format(coordsForBBox["minLat"],coordsForBBox["minLon"], coordsForBBox["maxLat"], coordsForBBox["maxLon"])
     query = '''
         [out:json]{3};
@@ -309,6 +309,4 @@ def findIdFromLatLon(lat, lon):
     query_params = {"data": query}
     response = requests.post(overPass_url, data=query_params)
     result = response.json()
-    print(lat, lon)
-    print(result)
     return result["elements"][0]["id"]

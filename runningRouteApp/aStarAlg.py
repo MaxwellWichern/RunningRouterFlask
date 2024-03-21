@@ -17,8 +17,9 @@ def aStarSearch(list, startNode, goalNode, mutateChance):
     path = []
     pathLength = 0
     while curNode != goalNode:
-        valueOfConnectedNodes = [0] * len(list[curNode])-1
-        connectedNodes = [None] * len(list[curNode])-1
+        length = len(list[curNode]) - 1
+        valueOfConnectedNodes = [0 for _ in range(length)]
+        connectedNodes = [None for _ in range(length)]
         hasBeenVisited = False
         for i, element in enumerate(list[curNode]):
             if i != 0:
@@ -29,7 +30,7 @@ def aStarSearch(list, startNode, goalNode, mutateChance):
                         break
                 connectedNodes[i] = element
                 if not hasBeenVisited:
-                    valueOfConnectedNodes[i] = heuristic(list, curNode, goalNode, 5, 5, 90)
+                    valueOfConnectedNodes[i] = heuristic(list, curNode, goalNode, 5, 1000, 90)
                     valueOfConnectedNodes[i] += element[1]
                 else:
                     valueOfConnectedNodes[i] = 1000
@@ -61,19 +62,19 @@ def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance):
     if startNode == goalNode:
         return 0
     pathLengths = []
-    for i in numberOfPaths:
+    for i in range(numberOfPaths):
         curLength = 0
         curNode = startNode
         curNodeIndex = -1
         visited = []
-        for j in nodeToGo:
+        for j in range(nodeToGo):
             chance = random.randint(1, 100)
             minDistance = 1000
             minDistanceNode = -1
             for k, element in enumerate(list[curNode]):
                 if k != 0:
-                    for l in len(visited):
-                        if visited[k] != element[0]:
+                    for l in range(len(visited)):
+                        if visited[l] != element[0]:
                             if element[1] < minDistance:
                                 minDistance = element[1]
                                 minDistanceNode = element[0]

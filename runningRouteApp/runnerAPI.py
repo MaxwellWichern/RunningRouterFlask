@@ -2,7 +2,7 @@ from flask import request, jsonify
 import requests
 import json
 from collections import OrderedDict
-from runningRouteApp.overpassAlgInit import overpassQuery, optimizeForAdjListMulti, createAdjListThreadless
+from runningRouteApp.overpassAlgInit import overpassQuery, optimizeForAdjListMulti, createAdjListThreadless, findIdFromLatLon
 from runningRouteApp.aStarAlg import searchRunner
 from geopy import distance
 from time import time
@@ -120,6 +120,8 @@ def bundlePythonResults():
     data = request.form
     newNeeded = False
     exisitingList = {}
+    lat = data["lat"]
+    lon = data["lon"]
     #2 check if we need to create a new adjacency list
         #2.1 if the request is not provided with an email, the user is not logged in, skip this because we need to save data with an email
     if data["email"]:
@@ -132,22 +134,26 @@ def bundlePythonResults():
             lat = existingList["center"][0]
             lon = existingList["center"][1]
             distanceToNode = int(distance.distance((lat, lon), (data['lat'], data['lon'])).miles * 100000) / 100000
-            if distanceToNode > float(data["mileage"])/2: newNeeded = True
+            if distanceToNode > float(data["mileage"])/2: 
+                print("new needed: distance > radius")
+                newNeeded = True
             
             #2.4 another concern is the same start node but different distance. if the distance is larger, we need a new list, otherwise it is okay and we can reuse it
             else:
-                if float(data["mileage"])/2 > float(existingList["radius"]): newNeeded = True
+                if float(data["mileage"])/2 > float(existingList["radius"]): 
+                    print("new needed: radius > existing radius")
+                    newNeeded = True
                 #2.5 update the TTL/date for the list
                 else:
                     adjList = json.loads(existingList["list"])
                     updateAdjListTTL(data["email"])
                     
             
-        else: newNeeded = True
+        else: 
+            print("new needed: no list yet")
+            newNeeded = True
         
     #3.1 if we need a new list get data from overpass using #1
-    lat = data["lat"]
-    lon = data["lon"]
     if newNeeded:
         result, lat, lon = overpassQuery(data['mileage'], lat, lon, data['direction'])
         #  use coords to calculate distances between nodes using getDistance()
@@ -164,16 +170,20 @@ def bundlePythonResults():
         #3.3 add the new adjacency list to mongo, replacing the old list and add the TTL date for the element
         try:
             if not data["email"]:
-                addAdjList(data["email"], adjList, [data['lat'], data['lon']], float(data["mileage"])/2.0, coordArray)
+                addAdjList(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray)
             else:
-                updateAdjListFull(data["email"], adjList, [data['lat'], data['lon']], float(data["mileage"])/2.0, coordArray)
+                updateAdjListFull(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray)
         except Exception as e:
             print("Error adding Element, check the form data")
             print(e)
     #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
     #list, startnode, goal node, length, n->the number of times to repeat while increasing mutate chance
-    path, length = searchRunner(adjList, , , data["mileage"], 15)
+    startid = findIdFromLatLon(lat,lon)
+    #this nex line finds the id of the first adjacent node
+    endid = adjList[startid][1][0]
+    path, length = searchRunner(adjList, endid, startid, data["mileage"], 15)
     #5 return routes
     
-    return jsonify(adjList)
+    return path, length
+
 

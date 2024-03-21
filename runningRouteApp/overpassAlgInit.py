@@ -296,3 +296,19 @@ def createAdjListThreadless(orderedDict):
                     break
 
     return adjList, coordArray
+
+def findIdFromLatLon(lat, lon):
+
+    query = """
+        [out:json];
+        node(around: 0.001, {}, {});
+        out ids;
+    """.format(lat, lon)
+
+    overPass_url = "https://overpass-api.de/api/interpreter"
+    query_params = {"data": query}
+    response = requests.post(overPass_url, data=query_params)
+    result = response.json()
+    print(lat, lon)
+    print(result)
+    return result["elements"][0]["id"]

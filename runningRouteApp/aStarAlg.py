@@ -72,11 +72,12 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
     print(pathLength)
     return path, pathLength
 
-def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance):
+def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance, amountToBreak):
     print("Entered Heuristic: {}".format(mutateChance))
     if startNode == goalNode:
         return 0
     pathLengths = []
+    count = 1
     for i in range(numberOfPaths):
         print(i)
         curLength = 0
@@ -109,6 +110,43 @@ def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance):
                 break
         if curNode == goalNode:
             pathLengths.append(curLength)
+
+    while(pathLengths.count < 1):
+        for i in range(numberOfPaths):
+            print(i)
+            curLength = 0
+            curNode = startNode
+            curNodeIndex = -1
+            visited = []
+            for j in range(nodeToGo):
+                print(j)
+                chance = random.randint(1, 100)
+                minDistance = 1000
+                minDistanceNode = -1
+                for k, element in enumerate(list[curNode]):
+                    if k != 0:
+                        for l in range(len(visited)):
+                            if visited[l] != element[0]:
+                                if element[1] < minDistance:
+                                    minDistance = element[1]
+                                    minDistanceNode = element[0]
+                visited.append(curNode)
+                #doesn't mutate
+                if chance < mutateChance:
+                    if minDistanceNode != -1:
+                        curLength += minDistance
+                        curNode = minDistanceNode
+                else:
+                    index = random.randint(1, len(list[curNode])-1)
+                    curLength += list[curNode][index][1]
+                    curNode = list[curNode][index][0]
+                if curNode == goalNode:
+                    break
+            if curNode == goalNode:
+                pathLengths.append(curLength)
+        if count >= amountToBreak:
+            break
+        count += 1
         
     minVal = 10000
     print(len(pathLengths))

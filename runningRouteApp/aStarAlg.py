@@ -33,7 +33,7 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
                 connectedNodes[i-1] = element
                 if not hasBeenVisited:
                     print("not visited")
-                    valueOfConnectedNodes[i-1] = heuristic(list, curNode, goalNode, heuristicNum, heuristicLength, heuristicMutation)
+                    valueOfConnectedNodes[i-1] = heuristic(list, curNode, goalNode, heuristicNum, heuristicLength, heuristicMutation, 1000)
                     valueOfConnectedNodes[i-1] += element[1]
                 else:
                     print("visited")
@@ -111,7 +111,7 @@ def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance, 
         if curNode == goalNode:
             pathLengths.append(curLength)
 
-    while(pathLengths.count < 1):
+    while(len(pathLengths) < 1):
         for i in range(numberOfPaths):
             print(i)
             curLength = 0

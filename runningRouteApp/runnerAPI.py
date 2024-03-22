@@ -162,7 +162,7 @@ def bundlePythonResults():
         print("Query Overpass")
         result, lat, lon = overpassQuery(data['mileage'], lat, lon, data['direction'])
         listSize = 0
-        for node in result:
+        for node in result["elements"]:
             if node["type"] == "node": listSize+=1
         #  use coords to calculate distances between nodes using getDistance()
         try:
@@ -199,7 +199,8 @@ def bundlePythonResults():
     #def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
     if (existingList):
         coordArray = existingList["coordArray"]
-    path, length = searchRunner(adjList, str(endid), str(startid), data["mileage"], 20, 0.5, 5, listSize * 0.25, 90, coordArray)
+        listSize = existingList["numNodes"]
+    path, length = searchRunner(adjList, str(endid), str(startid), data["mileage"], 20, 0.5, 5, int(listSize * 0.25), 90, coordArray)
     #5 return routes
     coordListPath = []
     for nodeId in path:

@@ -1,9 +1,11 @@
 import random
 
-def searchRunner(list, startNode, goalNode, length, n, TOL):
-    percentage = 95
-    for i in range(n):
-        possiblePath, curLength = aStarSearch(list, startNode, goalNode, percentage)
+def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
+    percentage = 90
+    #for i in range(n):
+        #print(i)
+    while True:
+        possiblePath, curLength = aStarSearch(list, startNode, goalNode, percentage, heuristicNum, heuristicLength, heuristicMutation)
         if float(curLength) > float(length)-TOL and float(curLength) < float(length)+TOL:
             return possiblePath, curLength
         percentage -= 5
@@ -12,7 +14,7 @@ def searchRunner(list, startNode, goalNode, length, n, TOL):
 
             
 
-def aStarSearch(list, startNode, goalNode, mutateChance):
+def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristicLength, heuristicMutation):
     curNode = startNode
     path = []
     pathLength = 0
@@ -30,11 +32,14 @@ def aStarSearch(list, startNode, goalNode, mutateChance):
                         break
                 connectedNodes[i-1] = element
                 if not hasBeenVisited:
-                    valueOfConnectedNodes[i-1] = heuristic(list, curNode, goalNode, 5, 100, 90)
+                    print("not visited")
+                    valueOfConnectedNodes[i-1] = heuristic(list, curNode, goalNode, heuristicNum, heuristicLength, heuristicMutation)
                     valueOfConnectedNodes[i-1] += element[1]
                 else:
+                    print("visited")
                     valueOfConnectedNodes[i-1] = 1000
-        
+        print("outside of heuristic issue")
+        print(pathLength)
         minVal = 1000
         minValNodeIndex = -1
         for i, element in enumerate(valueOfConnectedNodes):
@@ -60,19 +65,21 @@ def aStarSearch(list, startNode, goalNode, mutateChance):
     return path, pathLength
 
 def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance):
+    print("Entered Heuristic: {}".format(mutateChance))
     if startNode == goalNode:
         return 0
     pathLengths = []
     for i in range(numberOfPaths):
+        print(i)
         curLength = 0
         curNode = startNode
         curNodeIndex = -1
         visited = []
         for j in range(nodeToGo):
+            print(j)
             chance = random.randint(1, 100)
             minDistance = 1000
             minDistanceNode = -1
-            print(list[curNode])
             for k, element in enumerate(list[curNode]):
                 if k != 0:
                     for l in range(len(visited)):
@@ -96,10 +103,12 @@ def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance):
             pathLengths.append(curLength)
         
         minVal = 10000
+        print(len(pathLengths))
         if len(pathLengths) > 0:
             minVal = pathLengths[0]
             for el in pathLengths:
+                print(el)
                 if el < minVal:
                     minVal = el
-        
+        print("return 10000")
         return minVal

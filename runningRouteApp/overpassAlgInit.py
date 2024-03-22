@@ -271,28 +271,28 @@ def createAdjListThreadless(orderedDict):
                         #print(node)          
                         coordArray.append(el)
                         #the first element will be its location in coordArray
-                        adjList[node] = [len(coordArray)-1]
+                        adjList[str(node)] = [len(coordArray)-1]
                     
                     else: newNode = False
                     #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
                     if previousNode != -1:
-                        lat1 = coordArray[adjList[node][0]]['lat']
-                        lon1 = coordArray[adjList[node][0]]['lon']
+                        lat1 = coordArray[adjList[str(node)][0]]['lat']
+                        lon1 = coordArray[adjList[str(node)][0]]['lon']
                         lat2 = coordArray[previousNode]['lat']
                         lon2 = coordArray[previousNode]['lon']
                         #in miles
                         distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
                         #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
-                        adjList[node].append([coordArray[previousNode]["id"], distanceToNode])
+                        adjList[str(node)].append([str(coordArray[previousNode]["id"]), distanceToNode])
                         idOfLast = coordArray[previousNode]["id"]
-                        adjList[idOfLast].append([el["id"],distanceToNode])
+                        adjList[str(idOfLast)].append([str(el["id"]),distanceToNode])
                 
                     #if this was a new node
                     if newNode:
                         previousNode = len(coordArray)-1
                     #otherwise we want it to be the node at the old location
                     else:
-                        previousNode = adjList[node][0]
+                        previousNode = adjList[str(node)][0]
                     break
 
     return adjList, coordArray
@@ -309,4 +309,5 @@ def findIdFromLatLon(lat, lon):
     query_params = {"data": query}
     response = requests.post(overPass_url, data=query_params)
     result = response.json()
+    print(result)
     return result["elements"][0]["id"]

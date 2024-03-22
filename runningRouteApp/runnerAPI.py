@@ -184,19 +184,23 @@ def bundlePythonResults():
             print("Error adding Element, check the form data")
             print(e)
     #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
-    #list, startnode, goal node, length, n->the number of times to repeat while increasing mutate chance
+    print(adjList, file=open('adjList.txt', 'a'))
     print("find start id")
     startid = findIdFromLatLon(lat,lon)
     #this nex line finds the id of the first adjacent node
-    endid = adjList[startid][1][0]
+    print(startid)
+    endid = adjList[str(startid)][1][0]
     print(endid)
     print("Begin finding path")
-    path, length = searchRunner(adjList, endid, startid, data["mileage"], 30, 0.5)
+    #def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
+    path, length = searchRunner(adjList, str(endid), str(startid), data["mileage"], 20, 0.5, 5, 100, 90)
     #5 return routes
     coordListPath = []
+    if (existingList):
+        coordArray = existingList["coordArray"]
     for nodeId in path:
         coordListPath.append([coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]])
-        print('{},{},red,square,"Pune"'.format(coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]), file=open('output.txt', 'w'))
+        print('{},{},red,square,"Pune"'.format(coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]), file=open('output.txt', 'a'))
     return jsonify({"Path": coordListPath, "Length": length})
 
 

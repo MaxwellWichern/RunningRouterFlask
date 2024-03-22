@@ -157,9 +157,13 @@ def bundlePythonResults():
             newNeeded = True
         
     #3.1 if we need a new list get data from overpass using #1
+    
     if newNeeded:
         print("Query Overpass")
         result, lat, lon = overpassQuery(data['mileage'], lat, lon, data['direction'])
+        listSize = 0
+        for node in result:
+            if node["type"] == "node": listSize+=1
         #  use coords to calculate distances between nodes using getDistance()
         try:
             orderedResult = OrderedDict(result)
@@ -176,10 +180,10 @@ def bundlePythonResults():
         try:
             if not data["email"]:
                 print("Mongo Query: Add")
-                addAdjList(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray)
+                addAdjList(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize)
             else:
                 print("Mongo Query: update full")
-                updateAdjListFull(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray)
+                updateAdjListFull(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize)
         except Exception as e:
             print("Error adding Element, check the form data")
             print(e)
@@ -193,11 +197,11 @@ def bundlePythonResults():
     print(endid)
     print("Begin finding path")
     #def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
-    path, length = searchRunner(adjList, str(endid), str(startid), data["mileage"], 20, 0.5, 5, 100, 90)
-    #5 return routes
-    coordListPath = []
     if (existingList):
         coordArray = existingList["coordArray"]
+    path, length = searchRunner(adjList, str(endid), str(startid), data["mileage"], 20, 0.5, 5, listSize * 0.25, 90, coordArray)
+    #5 return routes
+    coordListPath = []
     for nodeId in path:
         coordListPath.append([coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]])
         print('{},{},red,square,"Pune"'.format(coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]), file=open('output.txt', 'a'))

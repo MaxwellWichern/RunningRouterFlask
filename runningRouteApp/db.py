@@ -30,12 +30,12 @@ def getAdjList(email):
     return list
 
 #add a new adjacency list
-def addAdjList(email, list, center, radius, coordArray):
+def addAdjList(email, list, center, radius, coordArray, numNodes):
     currList = getAdjList(email)
     if currList:
         print("Duplicate Email")
         return False
-    newList = {"email": email,"list": dumps(list), "createdAt": datetime.now(timezone.utc), "center": center, "radius": radius, "coordArray": coordArray}
+    newList = {"email": email,"list": dumps(list), "createdAt": datetime.now(timezone.utc), "center": center, "radius": radius, "coordArray": coordArray, "numNodes": numNodes}
     success = False
     try:
         db.adjacencyLists.insert_one(newList)
@@ -45,12 +45,12 @@ def addAdjList(email, list, center, radius, coordArray):
     return success
 
 #update an adjacency list if the user email already has an existing list
-def updateAdjListFull(email, list, center, radius, coordArray):
+def updateAdjListFull(email, list, center, radius, coordArray, numNodes):
     
     try:
         response = db.adjacencyLists.update_one(
             {"email": email},
-            {"$set": {"list": dumps(list), "createdAt": datetime.now(timezone.utc), "center": center, "radius": radius, "coordArray": coordArray}},
+            {"$set": {"list": dumps(list), "createdAt": datetime.now(timezone.utc), "center": center, "radius": radius, "coordArray": coordArray, "numNodes": numNodes}},
             upsert = True
         )
         return response

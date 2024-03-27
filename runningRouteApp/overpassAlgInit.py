@@ -4,6 +4,7 @@ from multiprocessing import Lock, Process
 import multiprocessing
 from threading import Semaphore
 from math import sqrt
+from .db import updateAdjListTTL
 
 
 #This function fixes the bounding box around the start location to help limit the number of nodes as well as add a neat utility to the user
@@ -73,23 +74,14 @@ def findCheckStart(lat, lon, mileage):
     while meters/2 < min and min == mileage:
         query = '''
             [out:json];
-
-            //Get all nodes around 80 meters of the coordinates and asign it to the output set .aroundnodes
-            node(around:{},{}, {})->.aroundnodes;
-
-            //get the ways using the input set aroundnodes, but bn is backward, then it filters highways of the specific tag. This uses a regular expression denoted by the ~, then ^ is start, $ is end, and the | is for or
-            way(bn.aroundnodes)[highway~"^(residential|primary|secondary|tertiary|unclassified)$"]->.allways;
-
-            //this finds the nodes of all ways and puts them into waynodes
-            node(w.allways)->.waynodes;
-
-            //union
             (
-                //combines both sets of nodes into one set
-                node.waynodes.aroundnodes; 
+                way(around: {0}, {1}, {2})["highway"="residential"];
+                way(around: {0}, {1}, {2})["highway"="secondary"];
+                way(around: {0}, {1}, {2})["highway"="tertiary"];
+                way(around: {0}, {1}, {2})["highway"="unclassified"];
+                way(around: {0}, {1}, {2})["highway"="primary"];
             );
-
-            //prints the previous set put into the default set ._
+            (._;>;);
             out body;
         '''.format(meters, float(lat), float(lon))
 
@@ -101,14 +93,15 @@ def findCheckStart(lat, lon, mileage):
         #finds the distance of the nodes that were found if any, the closest one is set as the start and returns
         minNode = None
         for node in result['elements']:
-            tempD = geopy.distance.distance((lat, lon), (node['lat'], node['lon']))
-            if tempD < min: 
-                min = tempD
-                minNode = node
+            if node["type"] == "node":
+                tempD = geopy.distance.distance((lat, lon), (node['lat'], node['lon']))
+                if tempD < min: 
+                    min = tempD
+                    minNode = node
         meters *= 2
 
     if minNode is None: return False
-    return minNode["lat"], minNode["lon"] 
+    return minNode["lat"], minNode["lon"] , minNode["id"]
         
 
 #This is the first method called to begin the route gen, specifically finding all the nodes and ways located in the area selected
@@ -122,9 +115,11 @@ def overpassQuery(mileage, lat, lon, direction):
     radius = 1609.344 * float(mileage)/2.0
     try:
         print("Find correct start")
-        lat, lon = findCheckStart(lat, lon, radius)
-    except:
-        return "Start point not within 2 mile area, recommended to find a new start"
+        lat, lon, startid = findCheckStart(lat, lon, radius)
+    except Exception as e:
+        print("Error: ", e)
+        print("Start point not within 2 mile area, recommended to find a new start")
+        return None
     #fix the bounding box
     print("Fix bounding box")
     coordsForBBox = fixBoundingBox(direction, float(lat), float(lon), float(mileage)/2)
@@ -147,7 +142,7 @@ def overpassQuery(mileage, lat, lon, direction):
     response = requests.post(overPass_url, data=query_params)
     result = response.json()
     #print(json.dumps(result, indent=2))
-    return result, lat, lon
+    return result, lat, lon, startid
 
 
 #Create an adjacency list from the given object/dict received from the overpass query
@@ -258,56 +253,69 @@ def createAdjListThreadless(orderedDict):
         roadType = element["tags"]["highway"]
         previousNode = -1
         #go through every node inside the way
-        for node in element["nodes"]:
-            #search for the actual node corresponding to the id of the 'node' variable above
-            for el in dictToList:
-                #if the type is not node, it is a way, just skip out. It is an arbitrary spot usually roughly half, where it switches
-                #but it is not set in stone at any one time
-                if el["type"] != "node": break
-                if el["id"] == node:
-                    newNode = True
-                    #if the node is new, add a new element to the dict and add an adjacency from previous to it and it to previous
-                    if node not in adjList:  
-                        #print(node)          
-                        coordArray.append(el)
-                        #the first element will be its location in coordArray
-                        adjList[str(node)] = [len(coordArray)-1]
+        for index, node in enumerate(element["nodes"]):
+            if index % 3 == 0:
+                #search for the actual node corresponding to the id of the 'node' variable above
+                for el in dictToList:
+                    #if the type is not node, it is a way, just skip out. It is an arbitrary spot usually roughly half, where it switches
+                    #but it is not set in stone at any one time
+                    if el["type"] != "node": break
+                    if el["id"] == node:
+                        newNode = True
+                        #if the node is new, add a new element to the dict and add an adjacency from previous to it and it to previous
+                        if node not in adjList:  
+                            #print(node)          
+                            coordArray.append(el)
+                            #the first element will be its location in coordArray
+                            adjList[str(node)] = [len(coordArray)-1]
+                        
+                        else: newNode = False
+                        #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
+                        if previousNode != -1:
+                            lat1 = coordArray[adjList[str(node)][0]]['lat']
+                            lon1 = coordArray[adjList[str(node)][0]]['lon']
+                            lat2 = coordArray[previousNode]['lat']
+                            lon2 = coordArray[previousNode]['lon']
+                            #in miles
+                            distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
+                            #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
+                            adjList[str(node)].append([str(coordArray[previousNode]["id"]), distanceToNode])
+                            idOfLast = coordArray[previousNode]["id"]
+                            adjList[str(idOfLast)].append([str(el["id"]),distanceToNode])
                     
-                    else: newNode = False
-                    #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
-                    if previousNode != -1:
-                        lat1 = coordArray[adjList[str(node)][0]]['lat']
-                        lon1 = coordArray[adjList[str(node)][0]]['lon']
-                        lat2 = coordArray[previousNode]['lat']
-                        lon2 = coordArray[previousNode]['lon']
-                        #in miles
-                        distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
-                        #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
-                        adjList[str(node)].append([str(coordArray[previousNode]["id"]), distanceToNode])
-                        idOfLast = coordArray[previousNode]["id"]
-                        adjList[str(idOfLast)].append([str(el["id"]),distanceToNode])
-                
-                    #if this was a new node
-                    if newNode:
-                        previousNode = len(coordArray)-1
-                    #otherwise we want it to be the node at the old location
-                    else:
-                        previousNode = adjList[str(node)][0]
-                    break
+                        #if this was a new node
+                        if newNode:
+                            previousNode = len(coordArray)-1
+                        #otherwise we want it to be the node at the old location
+                        else:
+                            previousNode = adjList[str(node)][0]
+                        break
 
     return adjList, coordArray
 
-def findIdFromLatLon(lat, lon):
+def validateExistingList(data, existingList):
+    #2.3 if it exists, we have our start node from the data element and we will have saved the start node with the list in mongodb to simplify this step
+        #----We can find the distance between these two points, if the distance is greater than the mileage, we definitely need one
+        lat = existingList["center"][0]
+        lon = existingList["center"][1]
+        adjList = dict()
+        newNeeded = False
+        distanceToNode = int(geopy.distance.distance((lat, lon), (data['lat'], data['lon'])).miles * 100000) / 100000
+        if distanceToNode > float(data["mileage"])/2: 
+            print("new needed: distance > radius")
+            newNeeded = True
+        
+        #2.4 another concern is the same start node but different distance. if the distance is larger, we need a new list, otherwise it is okay and we can reuse it
+        else:
+            if float(data["mileage"])/2 > float(existingList["radius"]): 
+                print("new needed: radius > existing radius")
+                newNeeded = True
+            #2.5 update the TTL/date for the list
+            else:
+                adjList = json.loads(existingList["list"])
+                lat=data['lat']
+                lon=data['lon']
+                print("Mongo Query: update TTL")
+                updateAdjListTTL(data["email"])    
+        return newNeeded, lat, lon, adjList
 
-    query = """
-        [out:json];
-        node(around: 0.001, {}, {});
-        out ids;
-    """.format(lat, lon)
-
-    overPass_url = "https://overpass-api.de/api/interpreter"
-    query_params = {"data": query}
-    response = requests.post(overPass_url, data=query_params)
-    result = response.json()
-    print(result)
-    return result["elements"][0]["id"]

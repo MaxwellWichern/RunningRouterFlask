@@ -1,11 +1,9 @@
 import random
 
-def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation, coordArray):
+def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
     percentage = 90
-    #for i in range(n):
-        #print(i)
-    while True:
-        possiblePath, curLength = aStarSearch(list, startNode, goalNode, percentage, heuristicNum, heuristicLength, heuristicMutation, coordArray)
+    while percentage > 0:
+        possiblePath, curLength = aStarSearch(list, startNode, goalNode, percentage, heuristicNum, heuristicLength, heuristicMutation)
         if float(curLength) > float(length)-TOL and float(curLength) < float(length)+TOL:
             return possiblePath, curLength
         percentage -= 5
@@ -14,7 +12,7 @@ def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuris
 
             
 
-def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristicLength, heuristicMutation, coordArray):
+def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristicLength, heuristicMutation):
     curNode = startNode
     path = []
     pathLength = 0
@@ -32,28 +30,19 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
                         break
                 connectedNodes[i-1] = element
                 if not hasBeenVisited:
-                    print("not visited")
                     valueOfConnectedNodes[i-1] = heuristic(list, curNode, goalNode, heuristicNum, heuristicLength, heuristicMutation, 1000)
                     valueOfConnectedNodes[i-1] += element[1]
                 else:
-                    print("visited")
                     valueOfConnectedNodes[i-1] = 1000
-        print("outside of heuristic issue")
-        print(pathLength)
         minVal = 1000
         minValNodeIndex = -1
-        print(valueOfConnectedNodes, file=open('output.txt', 'a'))
         for i, element in enumerate(valueOfConnectedNodes):
             if element < minVal:
                 if not hasBeenVisited:
-                    
                     minVal = element
                     minValNodeIndex = i
-                    print(minVal, file=open('output.txt', 'a'))
-                    print(minValNodeIndex, file=open('output.txt', 'a'))
         
         path.append(curNode)
-        print('{},{},red,square,"Pune"'.format(coordArray[list[curNode][0]]["lat"],coordArray[list[curNode][0]]["lon"]), file=open('output.txt', 'a'))
         chance = random.randint(1, 100)
         #does not mutate
         if chance < mutateChance:
@@ -63,29 +52,21 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
             index = random.randint(1, len(list[curNode])-1)
             pathLength += list[curNode][index][1]
             curNode = list[curNode][index][0]
-    print("", file=open('output.txt', 'a'))
-    print("", file=open('output.txt', 'a'))
-    print("", file=open('output.txt', 'a'))
-    print("", file=open('output.txt', 'a'))
+
     path.append(curNode)
-    print(path)
-    print(pathLength)
     return path, pathLength
 
 def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance, amountToBreak):
-    print("Entered Heuristic: {}".format(mutateChance))
     if startNode == goalNode:
         return 0
     pathLengths = []
     count = 1
     for i in range(numberOfPaths):
-        print(i)
         curLength = 0
         curNode = startNode
         curNodeIndex = -1
         visited = []
         for j in range(nodeToGo):
-            print(j)
             chance = random.randint(1, 100)
             minDistance = 1000
             minDistanceNode = -1
@@ -113,13 +94,11 @@ def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance, 
 
     while(len(pathLengths) < 1):
         for i in range(numberOfPaths):
-            print(i)
             curLength = 0
             curNode = startNode
             curNodeIndex = -1
             visited = []
             for j in range(nodeToGo):
-                print(j)
                 chance = random.randint(1, 100)
                 minDistance = 1000
                 minDistanceNode = -1
@@ -149,12 +128,9 @@ def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance, 
         count += 1
         
     minVal = 10000
-    print(len(pathLengths))
     if len(pathLengths) > 0:
         minVal = pathLengths[0]
         for el in pathLengths:
-            print(el)
             if el < minVal:
                 minVal = el
-    print("return 10000")
     return minVal

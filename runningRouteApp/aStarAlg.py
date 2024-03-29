@@ -111,7 +111,7 @@ def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance, 
         if curNode == goalNode:
             pathLengths.append(curLength)
 
-    while(pathLengths.count < 1):
+    while(len(pathLengths) < 1):
         for i in range(numberOfPaths):
             print(i)
             curLength = 0

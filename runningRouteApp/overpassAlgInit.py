@@ -5,6 +5,8 @@ import multiprocessing
 from threading import Semaphore
 from math import sqrt
 from .db import updateAdjListTTL
+import random
+from time import sleep, time
 
 
 #This function fixes the bounding box around the start location to help limit the number of nodes as well as add a neat utility to the user
@@ -87,8 +89,16 @@ def findCheckStart(lat, lon, mileage):
 
         overPass_url = "https://overpass-api.de/api/interpreter"
         query_params = {"data": query}
-        response = requests.post(overPass_url, data=query_params)
-        result = response.json()
+        failed = True
+        count = 0
+        while failed and count < 5:
+            try:
+                response = requests.post(overPass_url, data=query_params)
+                result = response.json()
+                failed = False
+            except requests.exceptions.ConnectionError as re: 
+                print("Error: ", re)
+            sleep(3)
 
         #finds the distance of the nodes that were found if any, the closest one is set as the start and returns
         minNode = None
@@ -122,7 +132,7 @@ def overpassQuery(mileage, lat, lon, direction):
         return None
     #fix the bounding box
     print("Fix bounding box")
-    coordsForBBox = fixBoundingBox(direction, float(lat), float(lon), float(mileage)/2)
+    coordsForBBox = fixBoundingBox(None, float(lat), float(lon), float(mileage)/2)
     bboxString = '[bbox: {}, {}, {}, {}]'.format(coordsForBBox["minLat"],coordsForBBox["minLon"], coordsForBBox["maxLat"], coordsForBBox["maxLon"])
     query = '''
         [out:json]{3};
@@ -139,8 +149,16 @@ def overpassQuery(mileage, lat, lon, direction):
     overPass_url = "https://overpass-api.de/api/interpreter"
     query_params = {"data": query}
     #This is the actual query using the data above
-    response = requests.post(overPass_url, data=query_params)
-    result = response.json()
+    failed = True
+    count = 0
+    while failed and count < 5:
+        try:
+            response = requests.post(overPass_url, data=query_params)
+            result = response.json()
+            failed = False
+        except requests.exceptions.ConnectionError as re: 
+            print("Error: ", re)
+        sleep(3)
     #print(json.dumps(result, indent=2))
     return result, lat, lon, startid
 
@@ -254,7 +272,7 @@ def createAdjListThreadless(orderedDict):
         previousNode = -1
         #go through every node inside the way
         for index, node in enumerate(element["nodes"]):
-            if index % 3 == 0:
+            #if index % 3 == 0:
                 #search for the actual node corresponding to the id of the 'node' variable above
                 for el in dictToList:
                     #if the type is not node, it is a way, just skip out. It is an arbitrary spot usually roughly half, where it switches
@@ -293,6 +311,10 @@ def createAdjListThreadless(orderedDict):
 
     return adjList, coordArray
 
+#this function takes in a list pulled from mongodb and the data provided by the user, it will check a few conditions
+#1) if the distance between the starting lat and lon and that provided by the user is greater than the mileage, a new list is needed
+#2) if the radius of data saved is less than that of the requested data/2, a new one is needed
+#3) otherwise it will be  allow the existing list setting lat lon and adjlist permanently in this use of the algorithm
 def validateExistingList(data, existingList):
     #2.3 if it exists, we have our start node from the data element and we will have saved the start node with the list in mongodb to simplify this step
         #----We can find the distance between these two points, if the distance is greater than the mileage, we definitely need one
@@ -318,4 +340,69 @@ def validateExistingList(data, existingList):
                 print("Mongo Query: update TTL")
                 updateAdjListTTL(data["email"])    
         return newNeeded, lat, lon, adjList
+
+#TODO:new process implemented here, break the length into at least 4 sections, once it is 4 miles, go mile by mile as each section
+#before we use the algorithm, we are going to break the route into n segments for an n length route
+def findCheckPoints(mileage, direction, lat, lon, id):
+    checkpoints = []
+    checkpoints.append([lat,lon,id])
+    lastLat = lat
+    lastLon = lon
+    bearingDegree = 290
+    if direction == 'North-East': bearingDegree=(bearingDegree+45)%360
+    elif direction == 'East': bearingDegree=(bearingDegree+90)%360
+    elif direction == 'South-East': bearingDegree=(bearingDegree+135)%360
+    elif direction == 'South': bearingDegree=(bearingDegree+180)%360
+    elif direction == 'South-West': bearingDegree=(bearingDegree+225)%360
+    elif direction == 'West': bearingDegree=(bearingDegree+270)%360
+    elif direction == 'North-West': bearingDegree=(bearingDegree+315)%360
+    else: bearingDegree = 290
+    
+    if mileage < 4:
+        bearingInterval = 30
+        for x in range(0, 4):
+            genRand = random.randint(-1,1)
+            if x != mileage - 1:
+                coords = geopy.distance.distance(miles=mileage/4).destination(geopy.Point(lastLat,lastLon), bearing=(bearingDegree+genRand)%360)
+                try:
+                    latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, mileage/4)
+                    checkpoints.append([latitude, longitude, newid])
+                    bearingDegree+=bearingInterval
+                    lastLat = latitude
+                    lastLon = longitude
+                except Exception as e:
+                    print("Error: ", e)
+                    print("None returned when finding point, may not exist")
+            else:
+                checkpoints.append([lat,lon,id])
+    else:
+        #Assume North of not provided: TODO Change this if it is not found and different direction needed
+        #from the beginning lat and lon, find a checkpoint a mile or less away a certain degree above the x axis.
+        #use this bearing +- 1 or 2 degrees of bearing to allow for some random for the rest of the segments starting at the one just found
+        #at the last segment, just connect it to the starting node
+        #Below modulus 360
+        #North: +0 degrees bearing, North-East: +45 degrees bearing, East: +90, SE: +135, S: +180, SW: +225, W: +270, NW: +315
+        randOut = random.randint(0,40)
+        print(randOut)
+        bearingInterval = (180-randOut)/mileage
+        for x in range(0, mileage):
+            print(x)
+            genRand = random.randint(-5,5)
+            if x != mileage - 1:
+                coords = geopy.distance.distance(miles=0.75).destination(geopy.Point(lastLat,lastLon), bearing=(bearingDegree+genRand)%360)
+                try:
+                    start = time()
+                    latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 1000)
+                    end = time() - start
+                    print(end)
+                    checkpoints.append([latitude, longitude, newid])
+                    bearingDegree+=bearingInterval
+                    lastLat = latitude
+                    lastLon = longitude
+                except Exception as e:
+                    print("Error: ", e)
+                    print("None returned when finding point, may not exist")
+            else:
+                checkpoints.append([lat, lon, id])
+    return checkpoints
 

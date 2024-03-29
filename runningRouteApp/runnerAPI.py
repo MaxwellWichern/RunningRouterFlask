@@ -11,6 +11,7 @@ from flask_cors import CORS
 import runningRouteApp.db as rdb
 import networkx as nx
 import geopy as gp
+from itertools import pairwise
 
 
 runnerBP = Blueprint('runner', __name__, template_folder='templates')
@@ -167,7 +168,8 @@ def bundlePythonResults():
         try:
             result, lat, lon, startid = rt.overpassQuery(data['mileage'], lat, lon, data['direction'])
         except Exception as e:
-            print("Could not create query")
+            print("Error:", e)
+            print("Failed to query Overpass")
             return e
         listSize = 0
         for node in result["elements"]:
@@ -200,19 +202,28 @@ def bundlePythonResults():
         startid = existingList["startid"]
     #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)    
     #this next line finds the id of the first adjacent node
-    endid = adjList[str(startid)][1][0]
-    #def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
 
-
-    #TODOnew process implemented here, break the length into at least 4 sections, once it is 4 miles, go mile by mile as each section
-    path, length = searchRunner(adjList, str(endid), str(startid), data["mileage"], 20, 0.5, 5, int(listSize * 0.25), 90)
-
-
+    #TODO:new process implemented here, break the length into at least 4 sections, once it is 4 miles, go mile by mile as each section
+    #The challenge for this will be determining nodes of a distance apart
+    checkpoints = rt.findCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid)
+    #checkpoints = [[44.8728405, -91.920204, 11296447595], [44.8631829, -91.9156872, 5721252922], [44.8630329, -91.9158912, 5721252924], [44.8620147, -91.9195998, 230863172], [44.8620198, -91.9212215, 230886202], [44.8616088, -91.9231841, 230928792], [44.86295, -91.9271909, 230863622], [44.8637679, -91.9284725, 10892357437], [44.8656617, -91.9310193, 6282978467], [44.8675018, -91.9322159, 6343827016], [44.8728405, -91.920204, 11296447595]]
+    print("",file=open('output.txt', 'w'))
+    for check in checkpoints:
+        print('{},{},red,square,"Pune"'.format(check[0], check[1]),file=open('output.txt', 'a'))
+    print(adjList,file=open('adjList.txt', 'w'))
+    totalPath = []
+    totalLength = 0
+    for coord, coord2 in pairwise(checkpoints):
+        #def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
+        path, length = searchRunner(adjList, str(coord[2]), str(coord2[2]), 1, 20, 1, 5, 100, 90)
+        totalPath+=path
+        totalLength+=length
+        print(totalLength)
 
     #5 return routes
     coordListPath = []
     print("",file=open('output.txt', 'w'))
-    for nodeId in path:
+    for nodeId in totalPath:
         coordListPath.append([coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]])
         print('{},{},red,square,"Pune"'.format(coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]), file=open('output.txt', 'a'))
     return jsonify({"Path": coordListPath, "Length": length})

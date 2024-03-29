@@ -1,4 +1,4 @@
-import bson
+
 from json import dumps
 from flask import current_app, g
 from werkzeug.local import LocalProxy

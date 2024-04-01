@@ -8,6 +8,7 @@ from functions import overpassQuery, optimizeForAdjListMulti, createAdjListThrea
 from geopy import distance
 from time import time, sleep
 from geopy.geocoders import Nominatim
+import json
 
 
 #tutorial default route
@@ -125,6 +126,17 @@ def bundlePythonResults():
     #3 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
     
     #4 return routes
-    
-    return adjList
+    # [[-91.91965027286508, 44.87654669116506], [-91.91575570891095, 44.876464760394896], [-91.91583283024758, 44.87559084067337], [-91.91949603336909, 44.87559084067337], [-91.91965027286508, 44.87654669116506]]
+    #lat, long
+    coordinates = [
+        {
+        "route" : [[-91.91965027286508, 44.87654669116506], [-91.91575570891095, 44.876464760394896], [-91.91583283024758, 44.87559084067337], [-91.91949603336909, 44.87559084067337], [-91.91965027286508, 44.87654669116506]]
+        }
+    ]
+    value = {
+        "coordinates": coordinates,
+        "length": [data['mileage']]
+    }
+    return json.dumps(value)
+    # return adjList
 

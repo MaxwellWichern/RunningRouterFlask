@@ -7,6 +7,9 @@ from math import sqrt
 from .db import updateAdjListTTL
 import random
 from time import sleep, time
+from itertools import pairwise
+import networkx as nx
+
 
 
 #This function fixes the bounding box around the start location to help limit the number of nodes as well as add a neat utility to the user
@@ -70,7 +73,7 @@ def fixBoundingBox(direction, lat, lon, distMile):
 #lat: latitude
 #lon: longitude
 #mileage: distance goal, but in this case it is used as the vicinity to check around
-def findCheckStart(lat, lon, mileage):
+def findCheckStart(lat, lon, mileage, list = None):
     meters = 20
     min = mileage
     while meters/2 < min and min == mileage:
@@ -98,16 +101,25 @@ def findCheckStart(lat, lon, mileage):
                 failed = False
             except requests.exceptions.ConnectionError as re: 
                 print("Error: ", re)
-            sleep(3)
+            sleep(1)
 
         #finds the distance of the nodes that were found if any, the closest one is set as the start and returns
         minNode = None
-        for node in result['elements']:
-            if node["type"] == "node":
-                tempD = geopy.distance.distance((lat, lon), (node['lat'], node['lon']))
-                if tempD < min: 
-                    min = tempD
-                    minNode = node
+        if list:
+            for node in result['elements']:
+                if node["type"] == "node":
+                    if str(node["id"]) in list:
+                        tempD = geopy.distance.distance((lat, lon), (node['lat'], node['lon']))
+                        if tempD < min: 
+                            min = tempD
+                            minNode = node
+        else:
+            for node in result['elements']:
+                if node["type"] == "node":
+                    tempD = geopy.distance.distance((lat, lon), (node['lat'], node['lon']))
+                    if tempD < min: 
+                        min = tempD
+                        minNode = node
         meters *= 2
 
     if minNode is None: return False
@@ -158,7 +170,7 @@ def overpassQuery(mileage, lat, lon, direction):
             failed = False
         except requests.exceptions.ConnectionError as re: 
             print("Error: ", re)
-        sleep(3)
+        sleep(1)
     #print(json.dumps(result, indent=2))
     return result, lat, lon, startid
 
@@ -311,6 +323,61 @@ def createAdjListThreadless(orderedDict):
 
     return adjList, coordArray
 
+#given the cumbersome data to process, I am going to limit ways to their endpoints and insert the midpoints when constructing the path
+#I will still have to loop through like before, including checking if a node is in the list already in order to add it, but the issue to overcome
+#is tracking the way id and how to associate it between each node. Perhaps I can have an extra element in each adjacency telling me which way it is connected by
+# I will have to be careful not to do it backwards however, so when inserting I have to check that
+#AdjacencyList Format at an id: [[nodeIdConnected, distance, wayIdConnectedBy],[...],[...]]
+def endpointList(orderedDict):
+    adjList = dict()
+    coordArray = dict()
+    wayList = dict()
+    dictToList = orderedDict["elements"]
+
+    #go through every way
+    for element in reversed(dictToList):
+        if element["type"] == "node": break
+        wayList[str(element["id"])] = element["nodes"]
+        wayLength = 0
+        first = ""
+        #cycle through each pair of nodes in the way
+        for index, (curNode, nextNode) in enumerate(pairwise(element["nodes"])):
+            #go through each node in the list to find its associated 
+            #add the first element to the adjacency list and coordArray
+            if index == 0 and curNode not in coordArray:
+                first = curNode
+                if str(first) not in adjList:
+                    adjList[str(first)] = []
+                for el in dictToList:
+                    if el["type"] == "way":
+                        break
+                    if str(el["id"]) == str(curNode):
+                        coordArray[str(curNode)] = el
+                        break
+            #all nodes will be added to the coordArray
+            if nextNode not in coordArray:
+                for el in dictToList:
+                    if el["type"] == "way":
+                        break
+                    if str(el["id"]) == str(nextNode):
+                        coordArray[str(nextNode)] = el
+                        break
+            
+            #find the distance between each node, the total distance is stored for each endpoint adjacency
+            lat1 = coordArray[str(curNode)]['lat']
+            lon1 = coordArray[str(curNode)]['lon']
+            lat2 = coordArray[str(nextNode)]['lat']
+            lon2 = coordArray[str(nextNode)]['lon']
+            wayLength += int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
+            #the next node will be the last node, so add it to the adjList if need be, otherwise, add the adjacency
+            if index == len(element["nodes"])-2:
+                if str(nextNode) not in adjList:
+                    adjList[str(nextNode)] = []
+                adjList[str(first)].append([coordArray[str(nextNode)]["id"], wayLength, element["id"]])
+                adjList[str(nextNode)].append([coordArray[str(first)]["id"], wayLength, element["id"]])
+
+    return adjList, coordArray, wayList
+
 #this function takes in a list pulled from mongodb and the data provided by the user, it will check a few conditions
 #1) if the distance between the starting lat and lon and that provided by the user is greater than the mileage, a new list is needed
 #2) if the radius of data saved is less than that of the requested data/2, a new one is needed
@@ -325,30 +392,32 @@ def validateExistingList(data, existingList):
         distanceToNode = int(geopy.distance.distance((lat, lon), (data['lat'], data['lon'])).miles * 100000) / 100000
         if distanceToNode > float(data["mileage"])/2: 
             print("new needed: distance > radius")
+            lat=data['lat']
+            lon=data['lon']
             newNeeded = True
         
         #2.4 another concern is the same start node but different distance. if the distance is larger, we need a new list, otherwise it is okay and we can reuse it
         else:
             if float(data["mileage"])/2 > float(existingList["radius"]): 
                 print("new needed: radius > existing radius")
+                lat=data['lat']
+                lon=data['lon']
                 newNeeded = True
             #2.5 update the TTL/date for the list
             else:
                 adjList = json.loads(existingList["list"])
-                lat=data['lat']
-                lon=data['lon']
                 print("Mongo Query: update TTL")
                 updateAdjListTTL(data["email"])    
         return newNeeded, lat, lon, adjList
 
 #TODO:new process implemented here, break the length into at least 4 sections, once it is 4 miles, go mile by mile as each section
 #before we use the algorithm, we are going to break the route into n segments for an n length route
-def findCheckPoints(mileage, direction, lat, lon, id):
+def findCheckPoints(mileage, direction, lat, lon, id, list):
     checkpoints = []
     checkpoints.append([lat,lon,id])
     lastLat = lat
     lastLon = lon
-    bearingDegree = 290
+    bearingDegree = 300
     if direction == 'North-East': bearingDegree=(bearingDegree+45)%360
     elif direction == 'East': bearingDegree=(bearingDegree+90)%360
     elif direction == 'South-East': bearingDegree=(bearingDegree+135)%360
@@ -356,16 +425,16 @@ def findCheckPoints(mileage, direction, lat, lon, id):
     elif direction == 'South-West': bearingDegree=(bearingDegree+225)%360
     elif direction == 'West': bearingDegree=(bearingDegree+270)%360
     elif direction == 'North-West': bearingDegree=(bearingDegree+315)%360
-    else: bearingDegree = 290
+    else: bearingDegree = 300
     
     if mileage < 4:
-        bearingInterval = 30
+        bearingInterval = 45
         for x in range(0, 4):
             genRand = random.randint(-1,1)
             if x != mileage - 1:
                 coords = geopy.distance.distance(miles=mileage/4).destination(geopy.Point(lastLat,lastLon), bearing=(bearingDegree+genRand)%360)
                 try:
-                    latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, mileage/4)
+                    latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, mileage/4, list)
                     checkpoints.append([latitude, longitude, newid])
                     bearingDegree+=bearingInterval
                     lastLat = latitude
@@ -382,21 +451,19 @@ def findCheckPoints(mileage, direction, lat, lon, id):
         #at the last segment, just connect it to the starting node
         #Below modulus 360
         #North: +0 degrees bearing, North-East: +45 degrees bearing, East: +90, SE: +135, S: +180, SW: +225, W: +270, NW: +315
-        randOut = random.randint(0,40)
-        print(randOut)
-        bearingInterval = (180-randOut)/mileage
+        bearingInterval = (180)/(mileage-2)
         for x in range(0, mileage):
             print(x)
-            genRand = random.randint(-5,5)
+            genRand = random.randint(-5,20)
             if x != mileage - 1:
                 coords = geopy.distance.distance(miles=0.75).destination(geopy.Point(lastLat,lastLon), bearing=(bearingDegree+genRand)%360)
                 try:
                     start = time()
-                    latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 1000)
+                    latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 500, list)
                     end = time() - start
                     print(end)
                     checkpoints.append([latitude, longitude, newid])
-                    bearingDegree+=bearingInterval
+                    bearingDegree+=bearingInterval+genRand
                     lastLat = latitude
                     lastLon = longitude
                 except Exception as e:
@@ -406,3 +473,14 @@ def findCheckPoints(mileage, direction, lat, lon, id):
                 checkpoints.append([lat, lon, id])
     return checkpoints
 
+def generateDataForOutput(adjList, coordArray):
+    G = nx.Graph()
+    for node in adjList:
+        for neighbor in adjList[str(node)]:
+            orig = coordArray[str(node)]
+            curNeighbor = coordArray[str(neighbor[0])]
+            G.add_node(node, pos=(orig['lon'], orig['lat']))
+            G.add_node(curNeighbor['id'], pos=(curNeighbor['lon'], curNeighbor['lat']))
+            G.add_edge(node, curNeighbor['id'], weight=neighbor[1])
+    
+    return G

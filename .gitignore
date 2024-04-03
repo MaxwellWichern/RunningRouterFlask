@@ -2,3 +2,6 @@
 __pycache__
 runningRouteApp\__pycache__
 pymongo_ini
+adjList.txt
+output.txt
+coords.txt

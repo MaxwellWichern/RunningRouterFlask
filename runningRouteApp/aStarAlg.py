@@ -1,4 +1,6 @@
 import random
+import math
+import geopy
 
 def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation, coordArray):
     percentage = 90
@@ -19,7 +21,7 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
     path = []
     pathLength = 0
     while curNode != goalNode:
-        length = len(list[curNode]) - 1
+        length = len(list[curNode])
         valueOfConnectedNodes = [0 for _ in range(length)]
         connectedNodes = [None for _ in range(length)]
         hasBeenVisited = False
@@ -45,12 +47,10 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
         print(valueOfConnectedNodes, file=open('output.txt', 'a'))
         for i, element in enumerate(valueOfConnectedNodes):
             if element < minVal:
-                if not hasBeenVisited:
-                    
-                    minVal = element
-                    minValNodeIndex = i
-                    print(minVal, file=open('output.txt', 'a'))
-                    print(minValNodeIndex, file=open('output.txt', 'a'))
+                minVal = element
+                minValNodeIndex = i
+                print(minVal, file=open('output.txt', 'a'))
+                print(minValNodeIndex, file=open('output.txt', 'a'))
         
         path.append(curNode)
         print('{},{},red,square,"Pune"'.format(coordArray[list[curNode][0]]["lat"],coordArray[list[curNode][0]]["lon"]), file=open('output.txt', 'a'))
@@ -72,7 +72,24 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
     print(pathLength)
     return path, pathLength
 
-def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance, amountToBreak):
+def taxiCabHeuristic(list, cordArray, curNode, goalNode):
+    if curNode == goalNode:
+        return 0
+    if len(list[curNode])  < 2:
+        return 1000
+    xDiff = abs(cordArray[str(goalNode)]["lon"] - cordArray[str(curNode)]["lon"]) #Need to find the latitutde values of curNode and goalNode
+    yDiff = abs(cordArray[str(goalNode)]["lat"] - cordArray[str(curNode)]["lat"]) #Need to find the longitude values of curNode and goalNode
+    return (xDiff + yDiff)
+
+def linearDistanceHeuristic(list, cordArray, curNode, goalNode):
+    if curNode == goalNode:
+        return 0
+    if len(list[curNode] < 2):
+        return 1000
+    return round(geopy.distance.distance((cordArray[str(goalNode)]["lat"],  (cordArray[str(goalNode)]["lon"]), (cordArray[str(curNode)]["lat"], cordArray[str(curNode)]["lon"]))).miles, 2)
+    #return math.sqrt((cordArray[str(goalNode)]["lat"] - cordArray[str(curNode)]["lat"])**2 + (cordArray[str(goalNode)]["lon"] - cordArray[str(curNode)]["lon"])**2)
+
+def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance, amountToBreak):
     print("Entered Heuristic: {}".format(mutateChance))
     if startNode == goalNode:
         return 0
@@ -84,26 +101,32 @@ def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance, 
         curNode = startNode
         curNodeIndex = -1
         visited = []
-        for j in range(nodeToGo):
+        for j in range(pathLength):
             print(j)
             chance = random.randint(1, 100)
             minDistance = 1000
             minDistanceNode = -1
             for k, element in enumerate(list[curNode]):
-                if k != 0:
-                    for l in range(len(visited)):
-                        if visited[l] != element[0]:
-                            if element[1] < minDistance:
-                                minDistance = element[1]
-                                minDistanceNode = element[0]
+                isVisited = False
+                for l in range(len(visited)):
+                    if visited[l] == element[0]:
+                        isVisited = True
+                if not isVisited:
+                    if element[1] < minDistance:
+                        minDistance = element[1]
+                        minDistanceNode = element[0]
             visited.append(curNode)
             #doesn't mutate
             if chance < mutateChance:
                 if minDistanceNode != -1:
                     curLength += minDistance
                     curNode = minDistanceNode
+                else:
+                    index = random.randint(0, len(list[curNode]))
+                    curLength += list[curNode][index][1]
+                    curNode = list[curNode][index][0] 
             else:
-                index = random.randint(1, len(list[curNode])-1)
+                index = random.randint(0, len(list[curNode]))
                 curLength += list[curNode][index][1]
                 curNode = list[curNode][index][0]
             if curNode == goalNode:
@@ -118,7 +141,7 @@ def heuristic(list, startNode, goalNode, numberOfPaths, nodeToGo, mutateChance, 
             curNode = startNode
             curNodeIndex = -1
             visited = []
-            for j in range(nodeToGo):
+            for j in range(pathLength):
                 print(j)
                 chance = random.randint(1, 100)
                 minDistance = 1000

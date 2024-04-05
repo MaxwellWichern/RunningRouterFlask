@@ -9,6 +9,7 @@ import random
 from time import sleep, time
 from itertools import pairwise
 import networkx as nx
+import matplotlib.pyplot as plt
 
 
 
@@ -74,7 +75,7 @@ def fixBoundingBox(direction, lat, lon, distMile):
 #lon: longitude
 #mileage: distance goal, but in this case it is used as the vicinity to check around
 def findCheckStart(lat, lon, mileage, list = None):
-    meters = 20
+    meters = 100
     min = mileage
     while meters/2 < min and min == mileage:
         query = '''
@@ -333,7 +334,7 @@ def endpointList(orderedDict):
     coordArray = dict()
     wayList = dict()
     dictToList = orderedDict["elements"]
-
+    print("", file=open('logging.txt', 'w'))
     #go through every way
     for element in reversed(dictToList):
         if element["type"] == "node": break
@@ -344,10 +345,9 @@ def endpointList(orderedDict):
         for index, (curNode, nextNode) in enumerate(pairwise(element["nodes"])):
             #go through each node in the list to find its associated 
             #add the first element to the adjacency list and coordArray
-            if index == 0 and curNode not in coordArray:
-                first = curNode
-                if str(first) not in adjList:
-                    adjList[str(first)] = []
+            if index == 0 and str(curNode) not in coordArray:
+                if str(curNode) not in adjList:
+                    adjList[str(curNode)] = []
                 for el in dictToList:
                     if el["type"] == "way":
                         break
@@ -355,7 +355,9 @@ def endpointList(orderedDict):
                         coordArray[str(curNode)] = el
                         break
             #all nodes will be added to the coordArray
-            if nextNode not in coordArray:
+            if str(nextNode) not in coordArray:
+                if str(nextNode) not in adjList:
+                    adjList[str(nextNode)] = []
                 for el in dictToList:
                     if el["type"] == "way":
                         break
@@ -369,12 +371,80 @@ def endpointList(orderedDict):
             lat2 = coordArray[str(nextNode)]['lat']
             lon2 = coordArray[str(nextNode)]['lon']
             wayLength += int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
-            #the next node will be the last node, so add it to the adjList if need be, otherwise, add the adjacency
-            if index == len(element["nodes"])-2:
-                if str(nextNode) not in adjList:
-                    adjList[str(nextNode)] = []
-                adjList[str(first)].append([coordArray[str(nextNode)]["id"], wayLength, element["id"]])
-                adjList[str(nextNode)].append([coordArray[str(first)]["id"], wayLength, element["id"]])
+            
+            adjList[str(curNode)].append([str(nextNode), wayLength, element["id"]])
+            adjList[str(nextNode)].append([str(curNode), wayLength, element["id"]])
+                
+    
+    #print("\n\n\nPruning excess\n\n\n", file=open('logging.txt', 'a'))
+    #print("Total List start: ", adjList, file=open('logging.txt', 'a'))
+    #prune nodes of degree 2 unless they are endpoints of their way
+    keysToDelete = []
+    for nodeSet in adjList:
+        #print(nodeSet, file=open('logging.txt', 'a'))
+        #print(adjList[nodeSet], file=open('logging.txt', 'a'))
+        if len(adjList[str(nodeSet)]) == 2:
+            #print("len == 2", file=open('logging.txt', 'a'))
+            #we need to check that the node is not at the endpoint of a way
+            firstAdjacency = adjList[str(nodeSet)][0]
+            secondAdjacency = adjList[str(nodeSet)][1]
+            #print("neighbor 1: ", firstAdjacency, file=open('logging.txt', 'a'))
+            #print("neighbor 2: ", secondAdjacency, file=open('logging.txt', 'a'))
+            #wayToCheck = wayList[str(firstAdjacency[2])]
+            #print("Checking ways of neighbors:\n", str(firstAdjacency[2]), "==", str(secondAdjacency[2]), file=open('logging.txt', 'a'))
+            if (str(firstAdjacency[2]) == str(secondAdjacency[2])):
+                #now that we know they are not an endpoint, I have to remove this adjacency and connect the other two adjacent nodes
+                #print("We can safely delete this node from the list, add it to the keyList", file=open('logging.txt', 'a'))
+                keysToDelete.append(str(nodeSet))
+    #print("\n\n\nFinally prepping to delete\n\n\n", file=open('logging.txt', 'a'))
+    for key in keysToDelete:
+        #print("Current key: ",key,": ", adjList[str(key)], file=open('logging.txt', 'a'))
+        #print("List to check, we are deleting\n",adjList, file=open('logging.txt', 'a'))
+        firstNeigh = adjList[key][0]
+        secondNeigh = adjList[key][1]
+
+        #print("Neighbor 1: ", firstNeigh, "\nNeighbor 2: ", secondNeigh, file=open('logging.txt', 'a'))
+        newDist = firstNeigh[1] + secondNeigh[1]
+        firstNeigh[1] = newDist
+        secondNeigh[1] = newDist
+        #print("New distance if we delete\nNeighbor 1: ", firstNeigh, "\nNeighbor 2: ", secondNeigh, file=open('logging.txt', 'a'))
+        #print("\tFirst: ", adjList[str(firstNeigh[0])], file=open('logging.txt', 'a'))
+        #print("\tSecond: ", adjList[str(secondNeigh[0])], file=open('logging.txt', 'a'))
+        adjList[str(firstNeigh[0])].append(secondNeigh)
+        adjList[str(secondNeigh[0])].append(firstNeigh)
+        #print("New adjacencies to connect first and second: ", file=open('logging.txt', 'a'))
+        #print("\tFirst: ", adjList[str(firstNeigh[0])], file=open('logging.txt', 'a'))
+        #print("\tSecond: ", adjList[str(secondNeigh[0])], file=open('logging.txt', 'a'))
+        #print("Key to delete: ",key,":=>", adjList[key], file=open('logging.txt', 'a'))
+        adjList.pop(key)
+        #try:
+         #   print("After: ", adjList[key], file=open('logging.txt', 'a'))
+        #except Exception as e:
+         #   print("key was popped, cannot add", file=open('logging.txt', 'a'))
+        #print("Now to remove its connections from the two adjacent nodes it had", file=open('logging.txt', 'a'))
+        #I also need to remove key from its adjacent adjacencies
+        for index, adjNode in enumerate(adjList[str(firstNeigh[0])]):
+            #print(str(adjNode[0]),"==", str(key), file=open('logging.txt', 'a'))
+            if str(adjNode[0]) == str(key):
+                #print("Equal", file=open('logging.txt', 'a'))
+                #print(adjList[str(firstNeigh[0])][index], "=", key, file=open('logging.txt', 'a'))
+                #print("Before: ", adjList[str(firstNeigh[0])], file=open('logging.txt', 'a'))
+                adjList[str(firstNeigh[0])].pop(index)
+                #print("After: ", adjList[str(firstNeigh[0])], file=open('logging.txt', 'a'))
+                break
+        for index, adjNode in enumerate(adjList[str(secondNeigh[0])]):
+            #print(str(adjNode[0]),"==", str(key), file=open('logging.txt', 'a'))
+            if str(adjNode[0]) == str(key):
+                #print("Equal", file=open('logging.txt', 'a'))
+                #print(adjList[str(secondNeigh[0])][index], "=", key, file=open('logging.txt', 'a'))
+                #print("Before: ", adjList[str(secondNeigh[0])], file=open('logging.txt', 'a'))
+                adjList[str(secondNeigh[0])].pop(index)
+                #print("After: ", adjList[str(secondNeigh[0])], file=open('logging.txt', 'a'))
+                break
+       
+    #print("Done", file=open('logging.txt', 'a'))
+            
+
 
     return adjList, coordArray, wayList
 

@@ -247,16 +247,17 @@ def bundlePythonResults():
     print(adjList, file=open('adjList.txt', 'a'))
 
     #TODO remove after testing
-    #G = rt.generateDataForOutput(adjList, coordArray)
+    G = rt.generateDataForOutput(adjList, coordArray)
     
-    #fig, ax = plt.subplots(figsize=(9, 7))
-    #plt.subplots_adjust(bottom=0.1, right=2, top=0.9, left=0.1)
-    #nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=False, node_size=2)
-    #plt.show()
+    fig, ax = plt.subplots(figsize=(9, 7))
+    plt.subplots_adjust(bottom=0.1, right=2, top=0.9, left=0.1)
+    nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=False, node_size=2)
+    plt.show()
     try:
         for coord, coord2 in pairwise(checkpoints):
             #def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
-            path, length = searchRunner(adjList, str(coord[2]), str(coord2[2]), 1, 20, 1, 5, max(int(listSize/100), 100), 90, coordArray)
+            print(int(listSize/50))
+            path, length = searchRunner(adjList, str(coord[2]), str(coord2[2]), 1, 20, 1, 5, 400, 80, coordArray)
             totalPath+=path
             totalLength+=length
             print(totalLength)

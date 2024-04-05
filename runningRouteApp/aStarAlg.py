@@ -24,7 +24,8 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
         valueOfConnectedNodes = [0 for _ in range(length)]
         connectedNodes = [None for _ in range(length)]
         hasBeenVisited = False
-        for i, element in enumerate(list[str(curNode)]):            
+        for i, element in enumerate(list[str(curNode)]):
+            #print(list[str(curNode)])
             hasBeenVisited = False
             for j in path:
                 if element[0] == j:
@@ -38,6 +39,7 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
                 valueOfConnectedNodes[i] = 10000
         minVal = 1000
         minValNodeIndex = -1
+        print(valueOfConnectedNodes, "\n")
         for i, element in enumerate(valueOfConnectedNodes):
             #print(element)
             if element < minVal:
@@ -45,6 +47,7 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
                 minValNodeIndex = i
         
         path.append(curNode)
+        print('\n\nactualNodeAdded'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))
         print('{},{},red,square,"Pune"'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))
         chance = random.randint(1, 100)
 
@@ -67,9 +70,6 @@ def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance
         return 0
     pathLengths = []
     count = 1
-    print(numberOfPaths * pathLength)
-    print(numberOfPaths)
-    print(pathLength)
     for i in range(numberOfPaths):
         curLength = 0
         curNode = startNode
@@ -107,12 +107,13 @@ def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance
                 index = random.randint(0, len(list[str(curNode)]))-1
                 curLength += list[str(curNode)][index][1]
                 curNode = list[str(curNode)][index][0]
-            if curNode == goalNode:
+            if str(curNode) == str(goalNode):
                 break
-        if curNode == goalNode:
+        if str(curNode) == str(goalNode):
             pathLengths.append(curLength)
 
     while(len(pathLengths) < 1):
+        print('Still not found')
         for i in range(numberOfPaths):
             curLength = 0
             curNode = startNode
@@ -133,7 +134,7 @@ def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance
                         if element[1] < minDistance:
                             minDistance = element[1]
                             minDistanceNode = element[0]
-                visited.append(curNode)
+                visited.append(str(curNode))
                 #doesn't mutate
                 if chance < mutateChance:
                     if minDistanceNode != -1:
@@ -143,14 +144,14 @@ def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance
                     index = random.randint(1, len(list[str(curNode)]))-1
                     curLength += list[str(curNode)][index][1]
                     curNode = list[str(curNode)][index][0]
-                if curNode == goalNode:
+                if str(curNode) == str(goalNode):
                     break
-            if curNode == goalNode:
+            if str(curNode) == str(goalNode):
                 pathLengths.append(curLength)
         if count >= amountToBreak:
             break
         count += 1
-        
+    print('found')
     minVal = 10000
     if len(pathLengths) > 0:
         minVal = pathLengths[0]

@@ -1,12 +1,11 @@
-import flask
-from flask_cors import CORS
+import configparser
+import os
+from runningRouteApp.factory import create_app
 
-app = flask.Flask(__name__)
-CORS(app)
-
-#import from runningRouteApp the necessary routes
-from runningRouteApp import bp as runner_bp
-app.register_blueprint(runner_bp)
+config = configparser.ConfigParser()
+config.read('pymongo_ini')
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app = create_app()
+    app.config['DEBUG'] = True
+    app.run()

@@ -2,14 +2,19 @@ from flask import request, jsonify
 import requests
 import json
 from collections import OrderedDict
-from runningRouteApp.overpassAlgInit import overpassQuery, optimizeForAdjListMulti, createAdjListThreadless, findIdFromLatLon
+import runningRouteApp.overpassAlgInit as rt
 from runningRouteApp.aStarAlg import searchRunner
 from geopy import distance
-from time import time
 from geopy.geocoders import Nominatim
 from flask import Blueprint
 from flask_cors import CORS
-from runningRouteApp.db import getAdjList, addAdjList, updateAdjListFull, updateAdjListTTL, deleteAdjList
+import runningRouteApp.db as rdb
+import networkx as nx
+import geopy as gp
+from itertools import pairwise
+import traceback
+import matplotlib.pyplot as plt
+
 
 
 runnerBP = Blueprint('runner', __name__, template_folder='templates')
@@ -112,100 +117,163 @@ def getLists():
     list["list"] = json.loads(list["list"])
     return list
 
+
+#test query with networkx
+@runnerBP.route("/netXOverpass", methods=['POST'])
+def getGraph():
+    data = request.form
+    print("Overpass Query")
+    result, lat, lon = rt.overpassQuery(data["mileage"], data["lat"], data["lon"], data["direction"])
+
+    # Create an empty NetworkX graph
+    G = nx.Graph()
+    coords = dict()
+    # Extract nodes and edges from the response
+    for element in reversed(result['elements']):
+        if element['type'] == 'way':
+            nodes = element['nodes']
+            for i in range(len(nodes) - 1):
+                if nodes[i] not in coords:
+                    coords[result['elements'][i]['id']] = (result["elements"][i])
+                distanceToNode = int(gp.distance.distance((result['elements'][i]['lat'], result['elements'][i]['lat']), (result['elements'][i+1]['lat'], result['elements'][i+1]['lat'])).miles * 100000) / 100000
+                
+                G.add_edge(nodes[i], nodes[i+1], weight=distanceToNode)
+        else: break
+    return result
+
+@runnerBP.route("/endpointTesting", methods=['POST'])
+def testEndpoint():
+    data = request.form
+    lat = data["lat"]
+    lon = data["lon"]
+    try:
+        result, lat, lon, startid = rt.overpassQuery(data['mileage'], lat, lon, data['direction'])
+    except Exception as e:
+        print("Error:", e)
+        print("Failed to query Overpass")
+        return e
+    listSize = 0
+    for node in result["elements"]:
+        if node["type"] == "node": listSize+=1
+    try:
+        orderedResult = OrderedDict(result)
+    except Exception as e:
+        print(e.__traceback__)
+        print("Error ", e)
+        print("Element was not a dict, cannot continue the algorithm")
+        return result
+    
+    adjList, coordArray = rt.endpointList(orderedResult)
+    return adjList
+
 #current main query, begins by getting data from overpass, it turns it into an orderedDict, and then 
 #turns the data into an adjacency list to be used for the algorithm
 @runnerBP.route("/overpassGather", methods=['POST'])
 def bundlePythonResults():
-    print("Bundle Query")
     #1 get data sent by this request, mileage/lat/lon/direction/ "user info"
     data = request.form
     newNeeded = False
     exisitingList = {}
+    startid=0
     lat = data["lat"]
     lon = data["lon"]
     #2 check if we need to create a new adjacency list
-        #2.1 if the request is not provided with an email, the user is not logged in, skip this because we need to save data with an email
+    #2.1 if the request is not provided with an email, the user is not logged in, skip this because we need to save data with an email
     if data["email"]:
-        #print(datetime.now(timezone.utc))
         #2.2 get the saved adjacency_list. If it doesn't exist, we can skip and go to 3 to create it
-        print("Mongo Query: GET")
-        existingList = getAdjList(data["email"])
+        existingList = rdb.getAdjList(data["email"])
         if existingList:
-            #2.3 if it exists, we have our start node from the data element and we will have saved the start node with the list in mongodb to simplify this step
-            #----We can find the distance between these two points, if the distance is greater than the mileage, we definitely need one
-            lat = existingList["center"][0]
-            lon = existingList["center"][1]
-            distanceToNode = int(distance.distance((lat, lon), (data['lat'], data['lon'])).miles * 100000) / 100000
-            if distanceToNode > float(data["mileage"])/2: 
-                print("new needed: distance > radius")
-                newNeeded = True
-            
-            #2.4 another concern is the same start node but different distance. if the distance is larger, we need a new list, otherwise it is okay and we can reuse it
-            else:
-                if float(data["mileage"])/2 > float(existingList["radius"]): 
-                    print("new needed: radius > existing radius")
-                    newNeeded = True
-                #2.5 update the TTL/date for the list
-                else:
-                    adjList = json.loads(existingList["list"])
-                    print("Mongo Query: update TTL")
-                    updateAdjListTTL(data["email"])
-                    
-            
+            newNeeded, lat, lon, tempList = rt.validateExistingList(data, existingList)
+            if tempList: 
+                adjList = tempList
+                print("list reset")
         else: 
             print("new needed: no list yet")
             newNeeded = True
         
     #3.1 if we need a new list get data from overpass using #1
-    
     if newNeeded:
-        print("Query Overpass")
-        result, lat, lon = overpassQuery(data['mileage'], lat, lon, data['direction'])
+        try:
+            result, lat, lon, startid = rt.overpassQuery(data['mileage'], lat, lon, data['direction'])
+        except Exception as e:
+            print("Error:", e)
+            print("Failed to query Overpass")
+            return e
         listSize = 0
         for node in result["elements"]:
             if node["type"] == "node": listSize+=1
-        #  use coords to calculate distances between nodes using getDistance()
         try:
             orderedResult = OrderedDict(result)
-        except:
+        except Exception as e:
+            print("Error ", e)
+            print("Element was not a dict, cannot continue the algorithm")
             return result
         
         #3.2 create the adjacency list and corresponding coordinate array which has latitude and longitude
-        print("Convert to adjacency list")
-        start = time()
-        adjList, coordArray = createAdjListThreadless(orderedResult)
-        finish = time()-start
-        print("Time: ", finish)
+        adjList, coordArray, wayList = rt.endpointList(orderedResult)
+
+        lat, lon, startid = rt.findCheckStart(lat, lon, 1600, adjList)
+        print(startid)
         #3.3 add the new adjacency list to mongo, replacing the old list and add the TTL date for the element
         try:
             if not data["email"]:
                 print("Mongo Query: Add")
-                addAdjList(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize)
+                rdb.addAdjList(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize, startid, wayList)
             else:
                 print("Mongo Query: update full")
-                updateAdjListFull(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize)
+                rdb.updateAdjListFull(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize, startid, wayList)
         except Exception as e:
             print("Error adding Element, check the form data")
             print(e)
-    #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
-    print(adjList, file=open('adjList.txt', 'a'))
-    print("find start id")
-    startid = findIdFromLatLon(lat,lon)
-    #this nex line finds the id of the first adjacent node
-    print(startid)
-    endid = adjList[str(startid)][1][0]
-    print(endid)
-    print("Begin finding path")
-    #def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
+
     if (existingList):
         coordArray = existingList["coordArray"]
         listSize = existingList["numNodes"]
-    path, length = searchRunner(adjList, str(endid), str(startid), data["mileage"], 20, 0.5, 5, int(listSize * 0.25), 90, coordArray)
+        startid = existingList["startid"]
+
+
+    #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)    
+    checkpoints = rt.findCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
+    print("",file=open('output.txt', 'w'))
+    for check in checkpoints:
+        print('{},{},red,square,"Pune"'.format(check[0], check[1]),file=open('output.txt', 'a'))
+    print("\n\n\n\n\n\n",file=open('output.txt', 'a'))
+    totalPath = []
+    totalLength = 0
+    print("Starting routing algorithm")
+    print("",file=open('coords.txt', 'w'))
+    print(coordArray, file=open('coords.txt', 'a'))
+    print("",file=open('adjList.txt', 'w'))
+    print(adjList, file=open('adjList.txt', 'a'))
+
+    #TODO remove after testing
+    G = rt.generateDataForOutput(adjList, coordArray)
+    
+    fig, ax = plt.subplots(figsize=(9, 7))
+    plt.subplots_adjust(bottom=0.1, right=2, top=0.9, left=0.1)
+    nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=False, node_size=2)
+    plt.show()
+    try:
+        for coord, coord2 in pairwise(checkpoints):
+            #def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
+            print(int(listSize/50))
+            path, length = searchRunner(adjList, str(coord[2]), str(coord2[2]), 1, 20, 1, 5, 400, 80, coordArray)
+            totalPath+=path
+            totalLength+=length
+            print(totalLength)
+    except Exception as exc:
+        print("Error: ", exc)
+        print("Checkpoints failed, no path found")
+        return traceback.print_exc()
+
+
+
     #5 return routes
-    coordListPath = []
-    for nodeId in path:
-        coordListPath.append([coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]])
+    coordListPath = [{"route":[]}]
+    print("",file=open('output.txt', 'w'))
+    for nodeId in totalPath:
+        coordListPath["route"].append([coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]])
         print('{},{},red,square,"Pune"'.format(coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]), file=open('output.txt', 'a'))
-    return jsonify({"Path": coordListPath, "Length": length})
+    return jsonify({"coordinates": coordListPath, "length": length})
 
 

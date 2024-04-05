@@ -1,6 +1,7 @@
 import random
-import networkx as nx
-import matplotlib.pyplot as plt
+import math
+import geopy
+
 
 def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation, coordArray):
     percentage = 100
@@ -21,6 +22,7 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
     while curNode != goalNode:
         #print(pathLength)
         length = len(list[str(curNode)])
+
         valueOfConnectedNodes = [0 for _ in range(length)]
         connectedNodes = [None for _ in range(length)]
         hasBeenVisited = False
@@ -47,8 +49,8 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
                 minValNodeIndex = i
         
         path.append(curNode)
-        print('\n\nactualNodeAdded'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))
-        print('{},{},red,square,"Pune"'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))
+        #print('\n\nactualNodeAdded'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))
+        #print('{},{},red,square,"Pune"'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))
         chance = random.randint(1, 100)
 
         #does not mutate
@@ -63,6 +65,31 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
     path.append(curNode)
     print('{},{},red,square,"Pune"'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))
     return path, pathLength
+
+def taxiCabHeuristic(list, cordArray, curNode, goalNode):
+    if curNode == goalNode:
+        return 0
+    if len(list[curNode])  < 2:
+        return 1000
+    xDiff = abs(cordArray[str(goalNode)]["lon"] - cordArray[str(curNode)]["lon"]) #Need to find the latitutde values of curNode and goalNode
+    yDiff = abs(cordArray[str(goalNode)]["lat"] - cordArray[str(curNode)]["lat"]) #Need to find the longitude values of curNode and goalNode
+    return (xDiff + yDiff)
+
+def linearDistanceHeuristic(list, cordArray, curNode, goalNode):
+    if curNode == goalNode:
+        return 0
+    if len(list[curNode] < 2):
+        return 1000
+    return round(geopy.distance.distance((cordArray[str(goalNode)]["lat"],  (cordArray[str(goalNode)]["lon"]), (cordArray[str(curNode)]["lat"], cordArray[str(curNode)]["lon"]))).miles, 2)
+    #return math.sqrt((cordArray[str(goalNode)]["lat"] - cordArray[str(curNode)]["lat"])**2 + (cordArray[str(goalNode)]["lon"] - cordArray[str(curNode)]["lon"])**2)
+
+def edgeRunnerHeuristic(list, startNode, goalNode, blockLength):
+    
+
+def blockFinder(list, marked, curNode, blockLength):
+    marked[]
+
+
 
 def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance, amountToBreak, coordArray):
     print("\n\nHeuristic\n\n", file=open('output.txt', 'a'))
@@ -82,14 +109,13 @@ def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance
             for k, element in enumerate(list[str(curNode)]):
                 isVisited = False
                 for l in range(len(visited)):
-                    #print(visited[l], " and ", element[0])
                     if visited[l] == str(element[0]):
-                        #print("Equal")
                         isVisited = True
                 if not isVisited:
                     if element[1] < minDistance:
                         minDistance = element[1]
                         minDistanceNode = element[0]
+
             visited.append(str(curNode))
             
             print('{},{},red,square,"Pune"'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))

@@ -89,6 +89,14 @@ def linearDistanceHeuristic(list, cordArray, curNode, goalNode):
     return round(geopy.distance.distance((cordArray[str(goalNode)]["lat"],  (cordArray[str(goalNode)]["lon"]), (cordArray[str(curNode)]["lat"], cordArray[str(curNode)]["lon"]))).miles, 2)
     #return math.sqrt((cordArray[str(goalNode)]["lat"] - cordArray[str(curNode)]["lat"])**2 + (cordArray[str(goalNode)]["lon"] - cordArray[str(curNode)]["lon"])**2)
 
+def edgeRunnerHeuristic(list, startNode, goalNode, blockLength):
+    
+
+def blockFinder(list, marked, curNode, blockLength):
+    marked[]
+
+
+
 def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance, amountToBreak):
     print("Entered Heuristic: {}".format(mutateChance))
     if startNode == goalNode:

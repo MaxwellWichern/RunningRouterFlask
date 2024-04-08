@@ -101,13 +101,13 @@ def linearDistanceHeuristic(list, cordArray, curNode, goalNode):
 
 
 def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance, amountToBreak, coordArray):
-    #print("\n\nHeuristic\n\n", file=open('output.txt', 'a'))
+    print("\n\nHeuristic\n\n", file=open('output.txt', 'a'))
     if startNode == goalNode:
         return 0
     pathLengths = []
     count = 1
     for i in range(numberOfPaths):
-        #print("\n\nNew Path\n\n", file=open('output.txt', 'a'))
+        print("\n\nNew Path\n\n", file=open('output.txt', 'a'))
         curLength = 0
         curNode = startNode
         curNodeIndex = -1
@@ -128,7 +128,7 @@ def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance
 
             visited.append(str(curNode))
             
-           #print('{},{},red,square,"Pune"'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))
+            print('{},{},red,square,"Pune"'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))
             
             #doesn't mutate
             if chance < mutateChance:

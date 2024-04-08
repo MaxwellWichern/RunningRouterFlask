@@ -26,33 +26,33 @@ def fixBoundingBox(direction, lat, lon, distMile):
     bboxFixedCoords["maxLon"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=90).longitude
     bboxFixedCoords["minLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=180).latitude
     bboxFixedCoords["maxLat"] = geopy.distance.distance(miles=distMile).destination(geopy.Point(lat,lon), bearing=0).latitude
-    if (direction == 'North'):
+    if (direction == 'N'):
         bboxFixedCoords["minLon"] = lon
-    elif (direction == 'East'):
+    elif (direction == 'E'):
         bboxFixedCoords["minLat"] = lat
-    elif (direction == 'South'):
+    elif (direction == 'S'):
         bboxFixedCoords["maxLon"] = lon
-    elif (direction == 'West'):
+    elif (direction == 'W'):
         bboxFixedCoords["maxLat"] = lat
-    elif (direction == 'North-East'):
+    elif (direction == 'NE'):
         topRight = geopy.distance.distance(miles=sqrt(2*distMile*distMile)).destination(geopy.Point(lat,lon), bearing=45)
         bboxFixedCoords["minLon"] = lon
         bboxFixedCoords["maxLon"] = topRight.longitude
         bboxFixedCoords["minLat"] = lat
         bboxFixedCoords["maxLat"] = topRight.latitude
-    elif (direction == 'South-East'):
+    elif (direction == 'SE'):
         bottomRight = geopy.distance.distance(miles=sqrt(2*distMile*distMile)).destination(geopy.Point(lat,lon), bearing=135)
         bboxFixedCoords["minLon"] = bottomRight.longitude
         bboxFixedCoords["maxLon"] = lon
         bboxFixedCoords["minLat"] = lat
         bboxFixedCoords["maxLat"] = bottomRight.latitude
-    elif (direction == 'South-West'):
+    elif (direction == 'SW'):
         bottomLeft = geopy.distance.distance(miles=sqrt(2*distMile*distMile)).destination(geopy.Point(lat,lon), bearing=225)
         bboxFixedCoords["minLon"] = bottomLeft.longitude
         bboxFixedCoords["maxLon"] = lon
         bboxFixedCoords["minLat"] = bottomLeft.latitude
         bboxFixedCoords["maxLat"] = lat
-    elif (direction == 'North-West'):
+    elif (direction == 'NW'):
         topLeft = geopy.distance.distance(miles=sqrt(2*distMile*distMile)).destination(geopy.Point(lat,lon), bearing=315)        
         bboxFixedCoords["minLon"] = lon
         bboxFixedCoords["maxLon"] = topLeft.longitude
@@ -375,76 +375,46 @@ def endpointList(orderedDict):
             adjList[str(curNode)].append([str(nextNode), wayLength, element["id"]])
             adjList[str(nextNode)].append([str(curNode), wayLength, element["id"]])
                 
-    
-    #print("\n\n\nPruning excess\n\n\n", file=open('logging.txt', 'a'))
-    #print("Total List start: ", adjList, file=open('logging.txt', 'a'))
     #prune nodes of degree 2 unless they are endpoints of their way
     keysToDelete = []
+    singlesToDelete = []
     for nodeSet in adjList:
-        #print(nodeSet, file=open('logging.txt', 'a'))
-        #print(adjList[nodeSet], file=open('logging.txt', 'a'))
         if len(adjList[str(nodeSet)]) == 2:
-            #print("len == 2", file=open('logging.txt', 'a'))
             #we need to check that the node is not at the endpoint of a way
-            firstAdjacency = adjList[str(nodeSet)][0]
+            firstAdjacency = adjList[str(nodeSet)][0]   
             secondAdjacency = adjList[str(nodeSet)][1]
-            #print("neighbor 1: ", firstAdjacency, file=open('logging.txt', 'a'))
-            #print("neighbor 2: ", secondAdjacency, file=open('logging.txt', 'a'))
-            #wayToCheck = wayList[str(firstAdjacency[2])]
-            #print("Checking ways of neighbors:\n", str(firstAdjacency[2]), "==", str(secondAdjacency[2]), file=open('logging.txt', 'a'))
             if (str(firstAdjacency[2]) == str(secondAdjacency[2])):
-                #now that we know they are not an endpoint, I have to remove this adjacency and connect the other two adjacent nodes
-                #print("We can safely delete this node from the list, add it to the keyList", file=open('logging.txt', 'a'))
                 keysToDelete.append(str(nodeSet))
-    #print("\n\n\nFinally prepping to delete\n\n\n", file=open('logging.txt', 'a'))
+        elif len(adjList[str(nodeSet)]) == 1:
+            singlesToDelete.append(str(nodeSet))
+            
     for key in keysToDelete:
-        #print("Current key: ",key,": ", adjList[str(key)], file=open('logging.txt', 'a'))
-        #print("List to check, we are deleting\n",adjList, file=open('logging.txt', 'a'))
         firstNeigh = adjList[key][0]
         secondNeigh = adjList[key][1]
 
-        #print("Neighbor 1: ", firstNeigh, "\nNeighbor 2: ", secondNeigh, file=open('logging.txt', 'a'))
         newDist = firstNeigh[1] + secondNeigh[1]
         firstNeigh[1] = newDist
         secondNeigh[1] = newDist
-        #print("New distance if we delete\nNeighbor 1: ", firstNeigh, "\nNeighbor 2: ", secondNeigh, file=open('logging.txt', 'a'))
-        #print("\tFirst: ", adjList[str(firstNeigh[0])], file=open('logging.txt', 'a'))
-        #print("\tSecond: ", adjList[str(secondNeigh[0])], file=open('logging.txt', 'a'))
+
         adjList[str(firstNeigh[0])].append(secondNeigh)
         adjList[str(secondNeigh[0])].append(firstNeigh)
-        #print("New adjacencies to connect first and second: ", file=open('logging.txt', 'a'))
-        #print("\tFirst: ", adjList[str(firstNeigh[0])], file=open('logging.txt', 'a'))
-        #print("\tSecond: ", adjList[str(secondNeigh[0])], file=open('logging.txt', 'a'))
-        #print("Key to delete: ",key,":=>", adjList[key], file=open('logging.txt', 'a'))
         adjList.pop(key)
-        #try:
-         #   print("After: ", adjList[key], file=open('logging.txt', 'a'))
-        #except Exception as e:
-         #   print("key was popped, cannot add", file=open('logging.txt', 'a'))
-        #print("Now to remove its connections from the two adjacent nodes it had", file=open('logging.txt', 'a'))
         #I also need to remove key from its adjacent adjacencies
         for index, adjNode in enumerate(adjList[str(firstNeigh[0])]):
-            #print(str(adjNode[0]),"==", str(key), file=open('logging.txt', 'a'))
             if str(adjNode[0]) == str(key):
-                #print("Equal", file=open('logging.txt', 'a'))
-                #print(adjList[str(firstNeigh[0])][index], "=", key, file=open('logging.txt', 'a'))
-                #print("Before: ", adjList[str(firstNeigh[0])], file=open('logging.txt', 'a'))
                 adjList[str(firstNeigh[0])].pop(index)
-                #print("After: ", adjList[str(firstNeigh[0])], file=open('logging.txt', 'a'))
                 break
         for index, adjNode in enumerate(adjList[str(secondNeigh[0])]):
-            #print(str(adjNode[0]),"==", str(key), file=open('logging.txt', 'a'))
             if str(adjNode[0]) == str(key):
-                #print("Equal", file=open('logging.txt', 'a'))
-                #print(adjList[str(secondNeigh[0])][index], "=", key, file=open('logging.txt', 'a'))
-                #print("Before: ", adjList[str(secondNeigh[0])], file=open('logging.txt', 'a'))
                 adjList[str(secondNeigh[0])].pop(index)
-                #print("After: ", adjList[str(secondNeigh[0])], file=open('logging.txt', 'a'))
                 break
-       
-    #print("Done", file=open('logging.txt', 'a'))
-            
-
+    for singles in singlesToDelete:
+        neighbor = adjList[singles][0]
+        for index, adjacent in enumerate(adjList[str(neighbor[0])]):
+            if str(adjacent[0]) == str(singles):
+                adjList[str(neighbor[0])].pop(index)
+                break
+        adjList.pop(singles)
 
     return adjList, coordArray, wayList
 
@@ -460,24 +430,26 @@ def validateExistingList(data, existingList):
         adjList = dict()
         newNeeded = False
         distanceToNode = int(geopy.distance.distance((lat, lon), (data['lat'], data['lon'])).miles * 100000) / 100000
-        if distanceToNode > float(data["mileage"])/2: 
+        if (data["direction"] != existingList["direction"]):
+            print("New needed: change in direction")
+            newNeeded = True
+        elif distanceToNode > float(data["mileage"])/2: 
             print("new needed: distance > radius")
             lat=data['lat']
             lon=data['lon']
             newNeeded = True
         
         #2.4 another concern is the same start node but different distance. if the distance is larger, we need a new list, otherwise it is okay and we can reuse it
+        elif float(data["mileage"])/2 > float(existingList["radius"]): 
+            print("new needed: radius > existing radius")
+            lat=data['lat']
+            lon=data['lon']
+            newNeeded = True
+        #2.5 update the TTL/date for the list
         else:
-            if float(data["mileage"])/2 > float(existingList["radius"]): 
-                print("new needed: radius > existing radius")
-                lat=data['lat']
-                lon=data['lon']
-                newNeeded = True
-            #2.5 update the TTL/date for the list
-            else:
-                adjList = json.loads(existingList["list"])
-                print("Mongo Query: update TTL")
-                updateAdjListTTL(data["email"])    
+            adjList = json.loads(existingList["list"])
+            print("Mongo Query: update TTL")
+            updateAdjListTTL(data["email"])    
         return newNeeded, lat, lon, adjList
 
 #TODO:new process implemented here, break the length into at least 4 sections, once it is 4 miles, go mile by mile as each section
@@ -488,13 +460,13 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
     lastLat = lat
     lastLon = lon
     bearingDegree = 300
-    if direction == 'North-East': bearingDegree=(bearingDegree+45)%360
-    elif direction == 'East': bearingDegree=(bearingDegree+90)%360
-    elif direction == 'South-East': bearingDegree=(bearingDegree+135)%360
-    elif direction == 'South': bearingDegree=(bearingDegree+180)%360
-    elif direction == 'South-West': bearingDegree=(bearingDegree+225)%360
-    elif direction == 'West': bearingDegree=(bearingDegree+270)%360
-    elif direction == 'North-West': bearingDegree=(bearingDegree+315)%360
+    if direction == 'NE': bearingDegree=(bearingDegree+45)%360
+    elif direction == 'E': bearingDegree=(bearingDegree+90)%360
+    elif direction == 'SE': bearingDegree=(bearingDegree+135)%360
+    elif direction == 'S': bearingDegree=(bearingDegree+180)%360
+    elif direction == 'SW': bearingDegree=(bearingDegree+225)%360
+    elif direction == 'W': bearingDegree=(bearingDegree+270)%360
+    elif direction == 'NW': bearingDegree=(bearingDegree+315)%360
     else: bearingDegree = 300
     
     if mileage < 4:
@@ -554,3 +526,41 @@ def generateDataForOutput(adjList, coordArray):
             G.add_edge(node, curNeighbor['id'], weight=neighbor[1])
     
     return G
+
+# when the path is determined at the end, the nodes need to be re added because they were separated and pruned.
+# This will allow a smooth curve when drawing the actual path
+# path: The old path
+# adjList: the adjacency list for which to search for pairwise path elements connections
+# wayList: the list of ways housing the mid nodes
+def mergeMidNodesForPath(path, adjList, wayList):
+    newPath = []
+    for first, second in pairwise(path):
+        firstNode = adjList[str(first)]
+        way = ""
+        for adjacencies in firstNode:
+            if str(second) == adjacencies[0]:
+                way = adjacencies[2]
+
+        #now that the way has been found for which they belong too, we can add the adjacent node ids
+        startAdding = False
+        for node in wayList[str(way)]["nodes"]:
+            if node == first:
+                startAdding=True
+                newPath += node
+            elif startAdding == True:
+                if node == second:
+                    newPath += node
+                    break
+            elif node == second:
+                for reversedNode in reversed(wayList[str(way)]["nodes"]):
+                    if reversedNode == second:
+                        newPath += reversedNode
+                        startAdding = True
+                    elif startAdding == True:
+                        newPath += reversedNode
+                    elif reversedNode == first:
+                        newPath += reversedNode
+                        break
+                break
+    return newPath
+            

@@ -257,7 +257,7 @@ def bundlePythonResults():
         for coord, coord2 in pairwise(checkpoints):
             #def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
             print(int(listSize/50))
-            path, length = searchRunner(adjList, str(coord[2]), str(coord2[2]), 1, 20, 1, 5, int(listSize/2), 80, coordArray)
+            path, length = searchRunner(adjList, str(coord[2]), str(coord2[2]), 1, 5, 5, 5, int(listSize/2), 80, coordArray)
             totalPath+=path
             totalLength+=length
             print(totalLength)

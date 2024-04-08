@@ -388,6 +388,7 @@ def endpointList(orderedDict):
         elif len(adjList[str(nodeSet)]) == 1:
             singlesToDelete.append(str(nodeSet))
             
+    print(singlesToDelete)            
     for key in keysToDelete:
         firstNeigh = adjList[key][0]
         secondNeigh = adjList[key][1]
@@ -409,12 +410,17 @@ def endpointList(orderedDict):
                 adjList[str(secondNeigh[0])].pop(index)
                 break
     for singles in singlesToDelete:
-        neighbor = adjList[singles][0]
-        for index, adjacent in enumerate(adjList[str(neighbor[0])]):
-            if str(adjacent[0]) == str(singles):
-                adjList[str(neighbor[0])].pop(index)
-                break
+        try:
+            neighbor = adjList[singles][0]
+            for index, adjacent in enumerate(adjList[str(neighbor[0])]):
+                if str(adjacent[0]) == str(singles):
+                    adjList[str(neighbor[0])].pop(index)
+                    break
+        except Exception as e:
+            print("Error: ", e)
+            print("Popping individual node")
         adjList.pop(singles)
+        
 
     return adjList, coordArray, wayList
 

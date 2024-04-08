@@ -31,18 +31,21 @@ def aStarSearch(list, startNode, goalNode, mutateChance, heuristicNum, heuristic
         for i, element in enumerate(list[str(curNode)]):
             #print(list[str(curNode)])
             hasBeenVisited = False
-            for j in path:
-                if element[0] == j:
-                    hasBeenVisited = True
-                    break
+            #for j in path:
+             #   if element[0] == j:
+              #      hasBeenVisited = True
+               #     break
             connectedNodes[i] = element
-            if not hasBeenVisited:
-                #valueOfConnectedNodes[i] = heuristic(list, str(curNode), str(goalNode), heuristicNum, heuristicLength, heuristicMutation, 100, coordArray)
-                valueOfConnectedNodes[i] = taxiCabHeuristic(list, coordArray, curNode, goalNode)
-                #print(valueOfConnectedNodes[i], file=open('connecteed.txt', 'a'))
-                valueOfConnectedNodes[i] += element[1]
-            else:
-                valueOfConnectedNodes[i] = 10000
+            #if not hasBeenVisited:
+
+            valueOfConnectedNodes[i] = heuristic(list, str(curNode), str(goalNode), heuristicNum, heuristicLength, heuristicMutation, 100, coordArray)
+            #valueOfConnectedNodes[i] = taxiCabHeuristic(list, coordArray, curNode, goalNode)
+            #valueOfConnectedNodes[i] = linearDistanceHeuristic(list, coordArray, curNode, goalNode)
+            #print(valueOfConnectedNodes[i], file=open('connecteed.txt', 'a'))
+            valueOfConnectedNodes[i] += element[1]
+
+            #else:
+             #   valueOfConnectedNodes[i] = 10000
         minVal = 1000
         minValNodeIndex = -1
         #print(valueOfConnectedNodes, "\n")
@@ -101,13 +104,13 @@ def linearDistanceHeuristic(list, cordArray, curNode, goalNode):
 
 
 def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance, amountToBreak, coordArray):
-    print("\n\nHeuristic\n\n", file=open('output.txt', 'a'))
+    #print("\n\nHeuristic\n\n", file=open('output.txt', 'a'))
     if startNode == goalNode:
         return 0
     pathLengths = []
     count = 1
     for i in range(numberOfPaths):
-        print("\n\nNew Path\n\n", file=open('output.txt', 'a'))
+        #print("\n\nNew Path\n\n", file=open('output.txt', 'a'))
         curLength = 0
         curNode = startNode
         curNodeIndex = -1
@@ -118,17 +121,17 @@ def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance
             minDistanceNode = -1
             for k, element in enumerate(list[str(curNode)]):
                 isVisited = False
-                for l in range(len(visited)):
-                    if visited[l] == str(element[0]):
-                        isVisited = True
-                if not isVisited:
-                    if element[1] < minDistance:
-                        minDistance = element[1]
-                        minDistanceNode = element[0]
+                #for l in range(len(visited)):
+                 #   if visited[l] == str(element[0]):
+                  #      isVisited = True
+                #if not isVisited:
+                if element[1] < minDistance:
+                    minDistance = element[1]
+                    minDistanceNode = element[0]
 
             visited.append(str(curNode))
             
-            print('{},{},red,square,"Pune"'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))
+            #print('{},{},red,square,"Pune"'.format(coordArray[str(curNode)]['lat'],coordArray[str(curNode)]['lon']),file=open('output.txt', 'a'))
             
             #doesn't mutate
             if chance < mutateChance:
@@ -161,15 +164,15 @@ def heuristic(list, startNode, goalNode, numberOfPaths, pathLength, mutateChance
                 minDistanceNode = -1
                 for k, element in enumerate(list[str(curNode)]):
                     isVisited = False
-                    for l in range(len(visited)):
+                    #for l in range(len(visited)):
                         #print(visited[l], " and ", element[0])
-                        if visited[l] == str(element[0]):
+                     #   if visited[l] == str(element[0]):
                             #print("Equal")
-                            isVisited = True
-                    if not isVisited:
-                        if element[1] < minDistance:
-                            minDistance = element[1]
-                            minDistanceNode = element[0]
+                      #      isVisited = True
+                    #if not isVisited:
+                    if element[1] < minDistance:
+                        minDistance = element[1]
+                        minDistanceNode = element[0]
                 visited.append(str(curNode))
                 #doesn't mutate
                 if chance < mutateChance:

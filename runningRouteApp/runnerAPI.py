@@ -218,10 +218,10 @@ def bundlePythonResults():
         try:
             if not data["email"]:
                 print("Mongo Query: Add")
-                rdb.addAdjList(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize, startid, wayList)
+                rdb.addAdjList(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize, startid, wayList, data["direction"])
             else:
                 print("Mongo Query: update full")
-                rdb.updateAdjListFull(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize, startid, wayList)
+                rdb.updateAdjListFull(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize, startid, wayList, data["direction"])
         except Exception as e:
             print("Error adding Element, check the form data")
             print(e)
@@ -257,7 +257,7 @@ def bundlePythonResults():
         for coord, coord2 in pairwise(checkpoints):
             #def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
             print(int(listSize/50))
-            path, length = searchRunner(adjList, str(coord[2]), str(coord2[2]), 1, 20, 1, 5, 400, 80, coordArray)
+            path, length = searchRunner(adjList, str(coord[2]), str(coord2[2]), 1, 20, 1, 5, int(listSize/2), 80, coordArray)
             totalPath+=path
             totalLength+=length
             print(totalLength)
@@ -267,7 +267,7 @@ def bundlePythonResults():
         return traceback.print_exc()
 
 
-
+    totalPath = rt.mergeMidNodesForPath(totalPath, adjList, wayList)
     #5 return routes
     coordListPath = [{"route":[]}]
     print("",file=open('output.txt', 'w'))

@@ -213,7 +213,6 @@ def bundlePythonResults():
         adjList, coordArray, wayList = rt.endpointList(orderedResult)
 
         lat, lon, startid = rt.findCheckStart(lat, lon, 1600, adjList)
-        print(startid)
         #3.3 add the new adjacency list to mongo, replacing the old list and add the TTL date for the element
         try:
             if not data["email"]:
@@ -230,9 +229,10 @@ def bundlePythonResults():
         coordArray = existingList["coordArray"]
         listSize = existingList["numNodes"]
         startid = existingList["startid"]
+        wayList = existingList["wayList"]
 
 
-    #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)    
+    #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
     checkpoints = rt.findCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
     print("",file=open('output.txt', 'w'))
     for check in checkpoints:
@@ -241,12 +241,7 @@ def bundlePythonResults():
     totalPath = []
     totalLength = 0
     print("Starting routing algorithm")
-    print("",file=open('coords.txt', 'w'))
-    print(coordArray, file=open('coords.txt', 'a'))
-    print("",file=open('adjList.txt', 'w'))
-    print(adjList, file=open('adjList.txt', 'a'))
 
-    #TODO remove after testing
     G = rt.generateDataForOutput(adjList, coordArray)
     
     fig, ax = plt.subplots(figsize=(9, 7))
@@ -255,25 +250,20 @@ def bundlePythonResults():
     plt.show()
     try:
         for coord, coord2 in pairwise(checkpoints):
-            #def searchRunner(list, startNode, goalNode, length, n, TOL, heuristicNum, heuristicLength, heuristicMutation):
-            print(int(listSize/50))
-            path, length = searchRunner(adjList, str(coord[2]), str(coord2[2]), 1, 20, 1, 5, int(listSize/2), 80, coordArray)
+            path = nx.astar_path(G, str(coord[2]), str(coord2[2]), weight='weight')
             totalPath+=path
-            totalLength+=length
-            print(totalLength)
+            totalLength+=nx.astar_path_length(G, str(coord[2]), str(coord2[2]), weight='weight')
     except Exception as exc:
         print("Error: ", exc)
         print("Checkpoints failed, no path found")
         return traceback.print_exc()
 
-
-    totalPath = rt.mergeMidNodesForPath(totalPath, adjList, wayList)
     #5 return routes
     coordListPath = [{"route":[]}]
     print("",file=open('output.txt', 'w'))
     for nodeId in totalPath:
-        coordListPath["route"].append([coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]])
-        print('{},{},red,square,"Pune"'.format(coordArray[adjList[nodeId][0]]["lat"],coordArray[adjList[nodeId][0]]["lon"]), file=open('output.txt', 'a'))
-    return jsonify({"coordinates": coordListPath, "length": length})
+        coordListPath[0]["route"].append([coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]])
+        print('{},{},red,square,"Pune"'.format(coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]), file=open('output.txt', 'a'))
+    return jsonify({"coordinates": coordListPath, "length": totalLength})
 
 

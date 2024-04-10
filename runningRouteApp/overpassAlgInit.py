@@ -345,24 +345,26 @@ def endpointList(orderedDict):
         for index, (curNode, nextNode) in enumerate(pairwise(element["nodes"])):
             #go through each node in the list to find its associated 
             #add the first element to the adjacency list and coordArray
-            if index == 0 and str(curNode) not in coordArray:
-                if str(curNode) not in adjList:
-                    adjList[str(curNode)] = []
+            curNode = str(curNode)
+            nextNode= str(nextNode)
+            if index == 0 and curNode not in coordArray:
+                if curNode not in adjList:
+                    adjList[curNode] = []
                 for el in dictToList:
                     if el["type"] == "way":
                         break
-                    if str(el["id"]) == str(curNode):
-                        coordArray[str(curNode)] = el
+                    if str(el["id"]) == curNode:
+                        coordArray[curNode] = el
                         break
             #all nodes will be added to the coordArray
-            if str(nextNode) not in coordArray:
-                if str(nextNode) not in adjList:
-                    adjList[str(nextNode)] = []
+            if nextNode not in coordArray:
+                if nextNode not in adjList:
+                    adjList[nextNode] = []
                 for el in dictToList:
                     if el["type"] == "way":
                         break
-                    if str(el["id"]) == str(nextNode):
-                        coordArray[str(nextNode)] = el
+                    if str(el["id"]) == nextNode:
+                        coordArray[nextNode] = el
                         break
             
             #find the distance between each node, the total distance is stored for each endpoint adjacency
@@ -372,11 +374,11 @@ def endpointList(orderedDict):
             lon2 = coordArray[str(nextNode)]['lon']
             wayLength += int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
             
-            adjList[str(curNode)].append([str(nextNode), wayLength, element["id"]])
-            adjList[str(nextNode)].append([str(curNode), wayLength, element["id"]])
+            adjList[curNode].append([nextNode, wayLength, element["id"]])
+            adjList[nextNode].append([curNode, wayLength, element["id"]])
                 
     #prune nodes of degree 2 unless they are endpoints of their way
-    keysToDelete = []
+    """ keysToDelete = []
     singlesToDelete = []
     for nodeSet in adjList:
         if len(adjList[str(nodeSet)]) == 2:
@@ -388,6 +390,7 @@ def endpointList(orderedDict):
         elif len(adjList[str(nodeSet)]) == 1:
             singlesToDelete.append(str(nodeSet))
             
+  
     for key in keysToDelete:
         firstNeigh = adjList[key][0]
         secondNeigh = adjList[key][1]
@@ -409,12 +412,16 @@ def endpointList(orderedDict):
                 adjList[str(secondNeigh[0])].pop(index)
                 break
     for singles in singlesToDelete:
-        neighbor = adjList[singles][0]
-        for index, adjacent in enumerate(adjList[str(neighbor[0])]):
-            if str(adjacent[0]) == str(singles):
-                adjList[str(neighbor[0])].pop(index)
-                break
         adjList.pop(singles)
+        try:
+            neighbor = adjList[singles][0]
+            for index, adjacent in enumerate(adjList[str(neighbor[0])]):
+                if str(adjacent[0]) == str(singles):
+                    adjList[str(neighbor[0])].pop(index)
+                    break
+        except Exception as e:
+            print("Error: ", e)
+            print("Popping individual node")"""
 
     return adjList, coordArray, wayList
 
@@ -467,18 +474,20 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
     elif direction == 'SW': bearingDegree=(bearingDegree+225)%360
     elif direction == 'W': bearingDegree=(bearingDegree+270)%360
     elif direction == 'NW': bearingDegree=(bearingDegree+315)%360
-    else: bearingDegree = 300
+    elif direction == 'N': bearingDegree=bearingDegree
+    else: bearingDegree=(bearingDegree+(45*random.randint(0,8)))%360
     
     if mileage < 4:
         bearingInterval = 45
         for x in range(0, 4):
-            genRand = random.randint(-1,1)
+            genRand = random.randint(-5,10)
             if x != mileage - 1:
                 coords = geopy.distance.distance(miles=mileage/4).destination(geopy.Point(lastLat,lastLon), bearing=(bearingDegree+genRand)%360)
                 try:
-                    latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, mileage/4, list)
+                    print(coords)
+                    latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 400, list)
                     checkpoints.append([latitude, longitude, newid])
-                    bearingDegree+=bearingInterval
+                    bearingDegree+=(bearingInterval + genRand)
                     lastLat = latitude
                     lastLon = longitude
                 except Exception as e:
@@ -495,17 +504,17 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
         #North: +0 degrees bearing, North-East: +45 degrees bearing, East: +90, SE: +135, S: +180, SW: +225, W: +270, NW: +315
         bearingInterval = (180)/(mileage-2)
         for x in range(0, mileage):
-            print(x)
-            genRand = random.randint(-5,20)
+            #print(x)
+            genRand = random.randint(-10,30)
             if x != mileage - 1:
                 coords = geopy.distance.distance(miles=0.75).destination(geopy.Point(lastLat,lastLon), bearing=(bearingDegree+genRand)%360)
                 try:
                     start = time()
-                    latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 500, list)
+                    latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 1609, list)
                     end = time() - start
-                    print(end)
+                    #print(end)
                     checkpoints.append([latitude, longitude, newid])
-                    bearingDegree+=bearingInterval+genRand
+                    bearingDegree+=(bearingInterval+genRand)
                     lastLat = latitude
                     lastLon = longitude
                 except Exception as e:
@@ -521,9 +530,9 @@ def generateDataForOutput(adjList, coordArray):
         for neighbor in adjList[str(node)]:
             orig = coordArray[str(node)]
             curNeighbor = coordArray[str(neighbor[0])]
-            G.add_node(node, pos=(orig['lon'], orig['lat']))
-            G.add_node(curNeighbor['id'], pos=(curNeighbor['lon'], curNeighbor['lat']))
-            G.add_edge(node, curNeighbor['id'], weight=neighbor[1])
+            G.add_node(str(node), pos=(orig['lon'], orig['lat']))
+            G.add_node(str(curNeighbor['id']), pos=(curNeighbor['lon'], curNeighbor['lat']))
+            G.add_edge(str(node), str(curNeighbor['id']), weight=neighbor[1])
     
     return G
 
@@ -535,32 +544,37 @@ def generateDataForOutput(adjList, coordArray):
 def mergeMidNodesForPath(path, adjList, wayList):
     newPath = []
     for first, second in pairwise(path):
-        firstNode = adjList[str(first)]
-        way = ""
-        for adjacencies in firstNode:
-            if str(second) == adjacencies[0]:
-                way = adjacencies[2]
-
-        #now that the way has been found for which they belong too, we can add the adjacent node ids
-        startAdding = False
-        for node in wayList[str(way)]["nodes"]:
-            if node == first:
-                startAdding=True
-                newPath += node
-            elif startAdding == True:
-                if node == second:
-                    newPath += node
+        first = str(first)
+        second = str(second)
+        if first != second:
+            firstNode = adjList[first]
+            way = ""
+            for adjacencies in firstNode:
+                if second == str(adjacencies[0]):
+                    way = str(adjacencies[2])
                     break
-            elif node == second:
-                for reversedNode in reversed(wayList[str(way)]["nodes"]):
-                    if reversedNode == second:
-                        newPath += reversedNode
-                        startAdding = True
-                    elif startAdding == True:
-                        newPath += reversedNode
-                    elif reversedNode == first:
-                        newPath += reversedNode
+            startAdding = False
+            try: 
+                for node in wayList[str(way)]:
+                    node = str(node)
+                    if node == first:
+                        startAdding=True
+                    elif startAdding:
+                        newPath.append(node)
+                        if node == second:
+                            break
+                    elif node == second:
+                        for reversedNode in reversed(wayList[way]):
+                            if reversedNode == second:
+                                startAdding = True
+                            elif startAdding:
+                                newPath.append(reversedNode)
+                            elif reversedNode == first:
+                                newPath.append(reversedNode)
+                                break
                         break
-                break
+            except Exception as e:
+                print("Empty way")
+                print("Error: ", e)
     return newPath
             

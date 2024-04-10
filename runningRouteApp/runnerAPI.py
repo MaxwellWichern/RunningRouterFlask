@@ -247,7 +247,7 @@ def bundlePythonResults():
     fig, ax = plt.subplots(figsize=(9, 7))
     plt.subplots_adjust(bottom=0.1, right=2, top=0.9, left=0.1)
     nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=False, node_size=2)
-    plt.show()
+    # plt.show()
     try:
         for coord, coord2 in pairwise(checkpoints):
             path = nx.astar_path(G, str(coord[2]), str(coord2[2]), weight='weight')
@@ -262,7 +262,7 @@ def bundlePythonResults():
     coordListPath = [{"route":[]}]
     print("",file=open('output.txt', 'w'))
     for nodeId in totalPath:
-        coordListPath[0]["route"].append([coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]])
+        coordListPath[0]["route"].append([coordArray[str(nodeId)]["lon"],coordArray[str(nodeId)]["lat"]])
         print('{},{},red,square,"Pune"'.format(coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]), file=open('output.txt', 'a'))
     return jsonify({"coordinates": coordListPath, "length": totalLength})
 

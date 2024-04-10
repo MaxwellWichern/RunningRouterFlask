@@ -106,6 +106,7 @@ def getNodesAndWays():
 def bundlePythonResults():
     #1 get data sent by this request, mileage/start/ other criteria
     data = request.form
+    print(data)
     #2 get data from overpass using #1
     result = overpassQuery(data['mileage'], data['lat'], data['lon'], data['direction'])
     #  use coords to calculate distances between nodes using getDistance()

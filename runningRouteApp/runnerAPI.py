@@ -3,7 +3,7 @@ import requests
 import json
 from collections import OrderedDict
 import runningRouteApp.overpassAlgInit as rt
-from runningRouteApp.aStarAlg import searchRunner
+import runningRouteApp.aStarAlg as alg
 from geopy import distance
 from geopy.geocoders import Nominatim
 from flask import Blueprint
@@ -250,9 +250,9 @@ def bundlePythonResults():
     # plt.show()
     try:
         for coord, coord2 in pairwise(checkpoints):
-            path = nx.astar_path(G, str(coord[2]), str(coord2[2]), weight='weight')
+            path = nx.astar_path(G, str(coord[2]), str(coord2[2]), heuristic=alg.xTaxiCabHeuristic, weight='weight')
             totalPath+=path
-            totalLength+=nx.astar_path_length(G, str(coord[2]), str(coord2[2]), weight='weight')
+            totalLength+=nx.astar_path_length(G, str(coord[2]), str(coord2[2]), heuristic=alg.xTaxiCabHeuristic, weight='weight')
     except Exception as exc:
         print("Error: ", exc)
         print("Checkpoints failed, no path found")

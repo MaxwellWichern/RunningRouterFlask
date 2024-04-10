@@ -76,6 +76,12 @@ def taxiCabHeuristic(list, cordArray, curNode, goalNode):
     B = round(geopy.distance.distance(GPoint,Z).miles, 5)
     return (A+B)
 
+def xTaxiCabHeuristic(curNode, goalNode):
+    (x1, y1) = curNode
+    (x2, y2) = goalNode
+
+    return (abs(y2 - y1) + abs(x2 - x1))
+
 def linearDistanceHeuristic(list, cordArray, curNode, goalNode):
     if str(curNode) == str(goalNode):
         return 0
@@ -83,6 +89,12 @@ def linearDistanceHeuristic(list, cordArray, curNode, goalNode):
         return 1000
     return round(geopy.distance.distance((cordArray[str(goalNode)]["lat"],  (cordArray[str(goalNode)]["lon"]), (cordArray[str(curNode)]["lat"], cordArray[str(curNode)]["lon"]))).miles, 2)
     #return math.sqrt((cordArray[str(goalNode)]["lat"] - cordArray[str(curNode)]["lat"])**2 + (cordArray[str(goalNode)]["lon"] - cordArray[str(curNode)]["lon"])**2)
+
+def xLinearDistanceHeuristic(curNode, goalNode):
+    (x1, y1) = curNode
+    (x2, y2) = goalNode
+
+    return (math.sqrt((y1-y2)**2 + (x1-x2)**2))
 
 #def edgeRunnerHeuristic(list, startNode, goalNode, blockLength):
     

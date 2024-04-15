@@ -530,3 +530,14 @@ def mergeMidNodesForPath(path, adjList, wayList):
                 print("Error: ", e)
     return newPath
             
+def xTaxiCabHeuristic(c, g):
+    (x1, y1) = c
+    (x2, y2) = g
+
+    return abs(y1-y2) + abs(x1 - x1)
+
+def xLinearDistanceHeuristic(c, g):
+    (x1, y1) = c
+    (x2, y2) = g
+
+    return sqrt((y1-y2)**2 + (x2-x1)**2)

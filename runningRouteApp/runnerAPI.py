@@ -1,3 +1,4 @@
+import os
 from flask import request, jsonify
 import requests
 import json
@@ -232,13 +233,18 @@ def bundlePythonResults():
     routes = []
     parallelDist = []    
     processes = []
+    Q = Queue()
     for x in range(0, 5):
-        newP = Process(target=findRoutes, args=(data, lat, lon, startid, adjList, coordArray, routes, parallelDist))
+        newP = Process(target=findRoutes, args=(Q,data, lat, lon, startid, adjList, coordArray, routes, parallelDist))
         newP.start()
         processes.append(newP)
 
     for process in processes:
         process.join()
+
+    for item in iter(Q.get, None):
+        routes.append[item[0]]
+        parallelDist.append[item[1]]
 
     #5 return routes
     coordListPath = []
@@ -253,13 +259,14 @@ def bundlePythonResults():
     return jsonify({"coordinates": coordListPath, "length": parallelDist})
 
 
-def findRoutes(data, lat, lon, startid, adjList, coordArray, routes, parallelDist):
+def findRoutes(Q, data, lat, lon, startid, adjList, coordArray, routes, parallelDist):
     TOL = 1.5
     CloseEnough = 4
     distance = 0
     totalPath = []
     numRoutes = 0
     while abs(distance-int(data["mileage"])) > TOL and numRoutes < 10:
+        print(os.getpid(), "=> Num Routes: ", numRoutes)
         #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
         distance = 0
         checkpoints = rt.findCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
@@ -276,18 +283,25 @@ def findRoutes(data, lat, lon, startid, adjList, coordArray, routes, parallelDis
             print("\n\n\n\n\n\n",file=open('output.txt', 'a'))
             try:
                 for coord, coord2 in pairwise(checkpoints):
-                    path = nx.astar_path(G, str(coord[2]), str(coord2[2]), weight='weight')
+                    print(os.getpid(), "=> ", coord, coord2)
+                    path = nx.astar_path(G, str(coord[2]), str(coord2[2]), heuristic=rt.x ,weight='weight')
+                    print(os.getpid(), "=> ", path)
                     totalPath+=path
                     distance+=nx.astar_path_length(G, str(coord[2]), str(coord2[2]), weight='weight')
+                    print(os.getpid(), "=> ", distance)
             except Exception as exc:
                 print("Error: ", exc)
                 print("Checkpoints failed, no path found")
                 return traceback.print_exc()
+            print(os.getpid(), "=> Close?",abs(distance-int(data["mileage"])) < CloseEnough)
             if abs(distance-int(data["mileage"])) < CloseEnough:
                 routes.append(totalPath)
                 parallelDist.append(distance)
-            totalPath = []
+            totalPath = []            
             numRoutes+=1
+            print(os.getpid(), "=> ", numRoutes)
         except Exception as e:
             print("Error: ", e)
             print("Coordinate List Issue")
+    
+    Q.put([routes,parallelDist])

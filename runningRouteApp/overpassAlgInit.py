@@ -1,3 +1,4 @@
+import os
 import requests, json
 import geopy.distance
 from multiprocessing import Lock, Process
@@ -434,8 +435,9 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
             if x != mileage - 1:
                 coords = geopy.distance.distance(miles=mileage/4).destination(geopy.Point(lastLat,lastLon), bearing=(bearingDegree+genRand)%360)
                 try:
-                    print(coords)
+                    start = time.now()
                     latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 400, list)
+                    print(os.getpid(), "=> ", start-time.now())
                     checkpoints.append([latitude, longitude, newid])
                     bearingDegree+=(bearingInterval + genRand)
                     lastLat = latitude
@@ -462,7 +464,7 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
                     start = time()
                     latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 1609, list)
                     end = time() - start
-                    #print(end)
+                    print(os.getpid(),"=> ", end)
                     checkpoints.append([latitude, longitude, newid])
                     bearingDegree+=(bearingInterval+genRand)
                     lastLat = latitude

@@ -30,7 +30,7 @@ def getAdjList(email):
     return list
 
 #add a new adjacency list
-def addAdjList(email, list, center, radius, coordArray, numNodes, startid, wayList, direction):
+def addAdjList(email, list, center, radius, coordArray, startid, direction):
     currList = getAdjList(email)
     if currList:
         print("Duplicate Email")
@@ -40,9 +40,7 @@ def addAdjList(email, list, center, radius, coordArray, numNodes, startid, wayLi
                "center": center, 
                "radius": radius, 
                "coordArray": coordArray, 
-               "numNodes": numNodes,
                "startid": startid,
-               "wayList": wayList,
                "direction": direction}
     success = False
     try:
@@ -53,7 +51,7 @@ def addAdjList(email, list, center, radius, coordArray, numNodes, startid, wayLi
     return success
 
 #update an adjacency list if the user email already has an existing list
-def updateAdjListFull(email, list, center, radius, coordArray, numNodes, startid, wayList, direction):
+def updateAdjListFull(email, list, center, radius, coordArray, startid,  direction):
     
     try:
         response = db.adjacencyLists.update_one(
@@ -63,9 +61,7 @@ def updateAdjListFull(email, list, center, radius, coordArray, numNodes, startid
                       "center": center, 
                       "radius": radius, 
                       "coordArray": coordArray, 
-                      "numNodes": numNodes,
                       "startid": startid,
-                      "wayList": wayList,
                       "direction": direction}},
             upsert = True
         )

@@ -275,13 +275,12 @@ def multiProcessTwo(wayList, nodeList, coordArray, adjList, sp):
 #-------------searchable only from the above nodes
 def createAdjListThreadless(orderedDict):
     adjList = dict()
-    coordArray = list()
+    coordArray = dict()
     dictToList = orderedDict["elements"]
 
     #go through every way
     for element in reversed(dictToList):
         if element["type"] == "node": break
-        roadType = element["tags"]["highway"]
         previousNode = -1
         #go through every node inside the way
         for index, node in enumerate(element["nodes"]):
@@ -332,15 +331,11 @@ def createAdjListThreadless(orderedDict):
 def endpointList(orderedDict):
     adjList = dict()
     coordArray = dict()
-    wayList = dict()
     dictToList = orderedDict["elements"]
     print("", file=open('logging.txt', 'w'))
     #go through every way
     for element in reversed(dictToList):
         if element["type"] == "node": break
-        wayList[str(element["id"])] = element["nodes"]
-        wayLength = 0
-        first = ""
         #cycle through each pair of nodes in the way
         for index, (curNode, nextNode) in enumerate(pairwise(element["nodes"])):
             #go through each node in the list to find its associated 
@@ -372,58 +367,13 @@ def endpointList(orderedDict):
             lon1 = coordArray[str(curNode)]['lon']
             lat2 = coordArray[str(nextNode)]['lat']
             lon2 = coordArray[str(nextNode)]['lon']
-            wayLength += int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
+            distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
             
-            adjList[curNode].append([nextNode, wayLength, element["id"]])
-            adjList[nextNode].append([curNode, wayLength, element["id"]])
-                
-    #prune nodes of degree 2 unless they are endpoints of their way
-    """ keysToDelete = []
-    singlesToDelete = []
-    for nodeSet in adjList:
-        if len(adjList[str(nodeSet)]) == 2:
-            #we need to check that the node is not at the endpoint of a way
-            firstAdjacency = adjList[str(nodeSet)][0]   
-            secondAdjacency = adjList[str(nodeSet)][1]
-            if (str(firstAdjacency[2]) == str(secondAdjacency[2])):
-                keysToDelete.append(str(nodeSet))
-        elif len(adjList[str(nodeSet)]) == 1:
-            singlesToDelete.append(str(nodeSet))
-            
-  
-    for key in keysToDelete:
-        firstNeigh = adjList[key][0]
-        secondNeigh = adjList[key][1]
+            adjList[curNode].append([nextNode, distanceToNode, element["id"]])
+            adjList[nextNode].append([curNode, distanceToNode, element["id"]])
 
-        newDist = firstNeigh[1] + secondNeigh[1]
-        firstNeigh[1] = newDist
-        secondNeigh[1] = newDist
 
-        adjList[str(firstNeigh[0])].append(secondNeigh)
-        adjList[str(secondNeigh[0])].append(firstNeigh)
-        adjList.pop(key)
-        #I also need to remove key from its adjacent adjacencies
-        for index, adjNode in enumerate(adjList[str(firstNeigh[0])]):
-            if str(adjNode[0]) == str(key):
-                adjList[str(firstNeigh[0])].pop(index)
-                break
-        for index, adjNode in enumerate(adjList[str(secondNeigh[0])]):
-            if str(adjNode[0]) == str(key):
-                adjList[str(secondNeigh[0])].pop(index)
-                break
-    for singles in singlesToDelete:
-        adjList.pop(singles)
-        try:
-            neighbor = adjList[singles][0]
-            for index, adjacent in enumerate(adjList[str(neighbor[0])]):
-                if str(adjacent[0]) == str(singles):
-                    adjList[str(neighbor[0])].pop(index)
-                    break
-        except Exception as e:
-            print("Error: ", e)
-            print("Popping individual node")"""
-
-    return adjList, coordArray, wayList
+    return adjList, coordArray
 
 #this function takes in a list pulled from mongodb and the data provided by the user, it will check a few conditions
 #1) if the distance between the starting lat and lon and that provided by the user is greater than the mileage, a new list is needed

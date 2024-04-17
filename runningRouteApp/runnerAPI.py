@@ -276,7 +276,7 @@ def findRoutes(Q, data, lat, lon, startid, adjList, coordArray):
         
         #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
         distance = 0
-        checkpoints = rt.findCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
+        checkpoints = rt.rectCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
         try:
             G = rt.generateDataForOutput(adjList, coordArray)
             fig, ax = plt.subplots(figsize=(9, 7))

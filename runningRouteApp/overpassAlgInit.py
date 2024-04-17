@@ -425,16 +425,24 @@ def rectCheckPoints(mileage, direction, lat, lon, id, list):
     elif direction == 'SW' or direction == 'W':
         startDegree += 270
     else:
-        startDegree = (startDegree + 90*random.randInt(0,4))%360
+        startDegree = (startDegree + 90*random.randint(0,4))%360
 
     h = mileage/4
     bearingInterval = 90
     
+    #TODO: randomise rectanglism and therefore the h
+    rectanglish = random.uniform(mileage/3, mileage/3)
+    dist = h
     for x in range(4):
         if (x == 0 and len(direction) == 1):
-            coords = geopy.distance.distance(h/2).destination(geopy.Point(lastLat,lastLon), bearing=(startDegree)%360)
+            dist = h/2
         else:
-            coords = geopy.distance.distance(h).destination(geopy.Point(lastLat,lastLon), bearing=(startDegree)%360)
+            if x%2 == 1:
+                dist = h + rectanglish
+            else:
+                dist = h - rectanglish
+        
+        coords = geopy.distance.distance(dist).destination(geopy.Point(lastLat,lastLon), bearing=(startDegree)%360)
 
         try:
             latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 400, list)

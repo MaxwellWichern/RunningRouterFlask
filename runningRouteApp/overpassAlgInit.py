@@ -11,6 +11,7 @@ from time import sleep, time
 from itertools import pairwise
 import networkx as nx
 import matplotlib.pyplot as plt
+import traceback
 
 
 
@@ -409,6 +410,46 @@ def validateExistingList(data, existingList):
             print("Mongo Query: update TTL")
             updateAdjListTTL(data["email"])    
         return newNeeded, lat, lon, adjList
+
+def rectCheckPoints(mileage, direction, lat, lon, id, list):
+    checkpoints = []
+    checkpoints.append([lat,lon,id])
+    lastLat = lat
+    lastLon = lon
+    #start assuming north
+    startDegree = 270
+    if direction == 'E' or direction == 'NE':
+        startDegree+=90
+    elif direction == 'SE' or direction == 'S':
+        startDegree+=180
+    elif direction == 'SW' or direction == 'W':
+        startDegree += 270
+    else:
+        startDegree = (startDegree + 90*random.randInt(0,4))%360
+
+    h = mileage/4
+    bearingInterval = 90
+    
+    for x in range(4):
+        if (x == 0 and len(direction) == 1):
+            coords = geopy.distance.distance(h/2).destination(geopy.Point(lastLat,lastLon), bearing=(startDegree)%360)
+        else:
+            coords = geopy.distance.distance(h).destination(geopy.Point(lastLat,lastLon), bearing=(startDegree)%360)
+
+        try:
+            latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 400, list)
+            checkpoints.append([latitude, longitude, newid])
+            startDegree+=(bearingInterval)
+            lastLat = latitude
+            lastLon = longitude
+        except Exception as e:
+            print("Error: ", e)
+            print(traceback.print_exc())
+
+        if len(direction) == 2 and x==3:
+            break
+    checkpoints.append([lat,lon,id])
+    return checkpoints
 
 #TODO:new process implemented here, break the length into at least 4 sections, once it is 4 miles, go mile by mile as each section
 #before we use the algorithm, we are going to break the route into n segments for an n length route

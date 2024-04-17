@@ -437,7 +437,6 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
                 try:
                     start = time.now()
                     latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 400, list)
-                    print(os.getpid(), "=> ", start-time.now())
                     checkpoints.append([latitude, longitude, newid])
                     bearingDegree+=(bearingInterval + genRand)
                     lastLat = latitude
@@ -464,7 +463,6 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
                     start = time()
                     latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 1609, list)
                     end = time() - start
-                    print(os.getpid(),"=> ", end)
                     checkpoints.append([latitude, longitude, newid])
                     bearingDegree+=(bearingInterval+genRand)
                     lastLat = latitude
@@ -483,6 +481,7 @@ def generateDataForOutput(adjList, coordArray):
             orig = coordArray[str(node)]
             curNeighbor = coordArray[str(neighbor[0])]
             G.add_node(str(node), pos=(orig['lon'], orig['lat']))
+ 
             G.add_node(str(curNeighbor['id']), pos=(curNeighbor['lon'], curNeighbor['lat']))
             G.add_edge(str(node), str(curNeighbor['id']), weight=neighbor[1])
     
@@ -530,11 +529,13 @@ def mergeMidNodesForPath(path, adjList, wayList):
                 print("Error: ", e)
     return newPath
             
-def xTaxiCabHeuristic(c, g):
-    (x1, y1) = c
-    (x2, y2) = g
+def xTaxiCabHeuristic(G, c, g):
+    pc = G.nodes[c]['pos']
+    pg = G.nodes[g]['pos']
+    (x1, y1) = pc
+    (x2, y2) = pg
 
-    return abs(y1-y2) + abs(x1 - x1)
+    return abs(y1 - y2) + abs(x1 - x2)
 
 def xLinearDistanceHeuristic(c, g):
     (x1, y1) = c

@@ -431,7 +431,7 @@ def rectCheckPoints(mileage, direction, lat, lon, id, list):
     bearingInterval = 90
     
     #TODO: randomise rectanglism and therefore the h
-    rectanglish = random.uniform(mileage/3, mileage/3)
+    rectanglish = random.uniform(-mileage/5, mileage/5)
     dist = h
     for x in range(4):
         if (x == 0 and len(direction) == 1):

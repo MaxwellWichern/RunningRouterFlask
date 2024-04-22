@@ -226,7 +226,7 @@ def bundlePythonResults():
             print(e)
 
     if (not newNeeded):
-        coordArray = existingList["coordArray"]
+        coordArray = json.loads(existingList["coordArray"])
         startid = existingList["startid"]
 
 
@@ -234,7 +234,7 @@ def bundlePythonResults():
     parallelDist = []    
     processes = []
     Q = Manager().Queue()
-    for x in range(0, 3):
+    for x in range(0, 5):
         newP = Process(target=findRoutes, args=(Q,data, lat, lon, startid, adjList, coordArray))
         newP.start()
         processes.append(newP)
@@ -245,6 +245,7 @@ def bundlePythonResults():
     counter = 0
     while not Q.empty():
         result = Q.get()
+        #if len(result[0]) != 0:
         routes.append(result[0])
         parallelDist.append(result[1])
 
@@ -254,7 +255,6 @@ def bundlePythonResults():
     print("",file=open('output.txt', 'w'))
     counter = 0
     for route in routes:
-        print(counter)
         coordListPath.append({"route":[]})
         for nodeId in route[0]:
             coordListPath[counter]["route"].append([coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]])
@@ -272,11 +272,13 @@ def findRoutes(Q, data, lat, lon, startid, adjList, coordArray):
     parallelDist = []
     numRoutes = 0
     numAttempts = 10
-    while abs(distance-int(data["mileage"])) > TOL and numRoutes < numAttempts:
-        
+    while (abs(distance-int(data["mileage"])) > TOL and numRoutes < numAttempts) or (numRoutes < numAttempts and int(data["mileage"]) == 1):
         #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
         distance = 0
-        checkpoints = rt.rectCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
+        if int(data["mileage"]) < 4: #Square
+            checkpoints = rt.rectCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
+        else : #circular
+            checkpoints = rt.findCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
         try:
             G = rt.generateDataForOutput(adjList, coordArray)
             fig, ax = plt.subplots(figsize=(9, 7))

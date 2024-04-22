@@ -3,6 +3,8 @@ from json import dumps
 from flask import current_app, g
 from werkzeug.local import LocalProxy
 from flask_pymongo import PyMongo
+import sys
+from math import ceil
 
 from datetime import datetime, timezone
 
@@ -39,12 +41,14 @@ def addAdjList(email, list, center, radius, coordArray, startid, direction):
                "createdAt": datetime.now(timezone.utc), 
                "center": center, 
                "radius": radius, 
-               "coordArray": coordArray, 
+               "coordArray": dumps(coordArray), 
                "startid": startid,
                "direction": direction}
     success = False
     try:
         db.adjacencyLists.insert_one(newList)
+        db.extraInfo.insert_one(newList)
+        print("No caught exception")
         success = True
     except Exception as e:
         print("Error on the insert: ", e)
@@ -54,17 +58,41 @@ def addAdjList(email, list, center, radius, coordArray, startid, direction):
 def updateAdjListFull(email, list, center, radius, coordArray, startid,  direction):
     
     try:
+        listSize = sys.getsizeof(list)
+        numExtraInfo = int(ceil(listSize / 100000))
+        list = dumps(list)
+        newList = []
+        if (numExtraInfo > 1):
+            newList = [ list[i:i+int(listSize/numExtraInfo)] for i in range(0, numExtraInfo, int(listSize/numExtraInfo)) ]
+            print(len(newList))
+            list = dumps(newList[0])
+            
         response = db.adjacencyLists.update_one(
             {"email": email},
-            {"$set": {"list": dumps(list), 
+            {"$set": {"list": list, 
                       "createdAt": datetime.now(timezone.utc), 
                       "center": center, 
                       "radius": radius, 
-                      "coordArray": coordArray, 
+                      "coordArray": dumps(coordArray), 
                       "startid": startid,
                       "direction": direction}},
             upsert = True
         )
+
+        if (numExtraInfo > 1):
+            for index, element in enumerate(newList[1:]):
+                responseExtra = db.extraInfo.update_one(
+                    {"email": email},
+                    {"$set": 
+                        {
+                        "list": dumps(element), 
+                        "createdAt": datetime.now(timezone.utc), 
+                        "coordArray": dumps(coordArray),
+                        "documentNum": index+1
+                        }
+                    },
+                    upsert = True
+                )
         return response
     except Exception as e:
         print("Error: ", e)

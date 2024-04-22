@@ -17,7 +17,7 @@ def get_db():
     if db is None:
         mongo = PyMongo(current_app).cx['main']
         db = g._database = mongo.db
-       
+    
     return db
 
 
@@ -27,6 +27,7 @@ db = LocalProxy(lambda: get_db())
 
 #Retrieves the adjacency list from mongodb using the field:
 #- 'email'; retrieved via login and being sent in process with the request
+#TODO: 
 def getAdjList(email):
     list = db.adjacencyLists.find_one({'email': email})
     return list

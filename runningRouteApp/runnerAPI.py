@@ -177,8 +177,10 @@ def bundlePythonResults():
     newNeeded = False
     exisitingList = {}
     startid=0
+    print(data)
     lat = data["lat"]
     lon = data["lon"]
+
     #2 check if we need to create a new adjacency list
     #2.1 if the request is not provided with an email, the user is not logged in, skip this because we need to save data with an email
     if data["email"]:
@@ -192,7 +194,7 @@ def bundlePythonResults():
         else: 
             print("new needed: no list yet")
             newNeeded = True
-        
+      
     #3.1 if we need a new list get data from overpass using #1
     if newNeeded:
         try:
@@ -210,6 +212,7 @@ def bundlePythonResults():
             return result
         
         #3.2 create the adjacency list and corresponding coordinate array which has latitude and longitude
+        print("Creating Adjacency List")
         adjList, coordArray = rt.endpointList(orderedResult)
 
         lat, lon, startid = rt.findCheckStart(lat, lon, 1600, adjList)
@@ -257,7 +260,7 @@ def bundlePythonResults():
     for route in routes:
         coordListPath.append({"route":[]})
         for nodeId in route[0]:
-            coordListPath[counter]["route"].append([coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]])
+            coordListPath[counter]["route"].append([coordArray[str(nodeId)]["lon"],coordArray[str(nodeId)]["lat"]])
             print('{},{},red,square,"Pune"'.format(coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]), file=open('output.txt', 'a'))
         counter+=1
         print('\n\nNew Route\n\n', file=open('output.txt', 'a'))

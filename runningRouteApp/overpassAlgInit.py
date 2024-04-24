@@ -1,3 +1,4 @@
+import os
 import requests, json
 import geopy.distance
 from multiprocessing import Lock, Process
@@ -10,6 +11,7 @@ from time import sleep, time
 from itertools import pairwise
 import networkx as nx
 import matplotlib.pyplot as plt
+import traceback
 
 
 
@@ -275,13 +277,12 @@ def multiProcessTwo(wayList, nodeList, coordArray, adjList, sp):
 #-------------searchable only from the above nodes
 def createAdjListThreadless(orderedDict):
     adjList = dict()
-    coordArray = list()
+    coordArray = dict()
     dictToList = orderedDict["elements"]
 
     #go through every way
     for element in reversed(dictToList):
         if element["type"] == "node": break
-        roadType = element["tags"]["highway"]
         previousNode = -1
         #go through every node inside the way
         for index, node in enumerate(element["nodes"]):
@@ -332,15 +333,11 @@ def createAdjListThreadless(orderedDict):
 def endpointList(orderedDict):
     adjList = dict()
     coordArray = dict()
-    wayList = dict()
     dictToList = orderedDict["elements"]
     print("", file=open('logging.txt', 'w'))
     #go through every way
     for element in reversed(dictToList):
         if element["type"] == "node": break
-        wayList[str(element["id"])] = element["nodes"]
-        wayLength = 0
-        first = ""
         #cycle through each pair of nodes in the way
         for index, (curNode, nextNode) in enumerate(pairwise(element["nodes"])):
             #go through each node in the list to find its associated 
@@ -372,58 +369,13 @@ def endpointList(orderedDict):
             lon1 = coordArray[str(curNode)]['lon']
             lat2 = coordArray[str(nextNode)]['lat']
             lon2 = coordArray[str(nextNode)]['lon']
-            wayLength += int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
+            distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
             
-            adjList[curNode].append([nextNode, wayLength, element["id"]])
-            adjList[nextNode].append([curNode, wayLength, element["id"]])
-                
-    #prune nodes of degree 2 unless they are endpoints of their way
-    """ keysToDelete = []
-    singlesToDelete = []
-    for nodeSet in adjList:
-        if len(adjList[str(nodeSet)]) == 2:
-            #we need to check that the node is not at the endpoint of a way
-            firstAdjacency = adjList[str(nodeSet)][0]   
-            secondAdjacency = adjList[str(nodeSet)][1]
-            if (str(firstAdjacency[2]) == str(secondAdjacency[2])):
-                keysToDelete.append(str(nodeSet))
-        elif len(adjList[str(nodeSet)]) == 1:
-            singlesToDelete.append(str(nodeSet))
-            
-  
-    for key in keysToDelete:
-        firstNeigh = adjList[key][0]
-        secondNeigh = adjList[key][1]
+            adjList[curNode].append([nextNode, distanceToNode, element["id"]])
+            adjList[nextNode].append([curNode, distanceToNode, element["id"]])
 
-        newDist = firstNeigh[1] + secondNeigh[1]
-        firstNeigh[1] = newDist
-        secondNeigh[1] = newDist
 
-        adjList[str(firstNeigh[0])].append(secondNeigh)
-        adjList[str(secondNeigh[0])].append(firstNeigh)
-        adjList.pop(key)
-        #I also need to remove key from its adjacent adjacencies
-        for index, adjNode in enumerate(adjList[str(firstNeigh[0])]):
-            if str(adjNode[0]) == str(key):
-                adjList[str(firstNeigh[0])].pop(index)
-                break
-        for index, adjNode in enumerate(adjList[str(secondNeigh[0])]):
-            if str(adjNode[0]) == str(key):
-                adjList[str(secondNeigh[0])].pop(index)
-                break
-    for singles in singlesToDelete:
-        adjList.pop(singles)
-        try:
-            neighbor = adjList[singles][0]
-            for index, adjacent in enumerate(adjList[str(neighbor[0])]):
-                if str(adjacent[0]) == str(singles):
-                    adjList[str(neighbor[0])].pop(index)
-                    break
-        except Exception as e:
-            print("Error: ", e)
-            print("Popping individual node")"""
-
-    return adjList, coordArray, wayList
+    return adjList, coordArray
 
 #this function takes in a list pulled from mongodb and the data provided by the user, it will check a few conditions
 #1) if the distance between the starting lat and lon and that provided by the user is greater than the mileage, a new list is needed
@@ -459,6 +411,54 @@ def validateExistingList(data, existingList):
             updateAdjListTTL(data["email"])    
         return newNeeded, lat, lon, adjList
 
+def rectCheckPoints(mileage, direction, lat, lon, id, list):
+    checkpoints = []
+    checkpoints.append([lat,lon,id])
+    lastLat = lat
+    lastLon = lon
+    #start assuming north
+    startDegree = 270
+    if direction == 'E' or direction == 'NE':
+        startDegree+=90
+    elif direction == 'SE' or direction == 'S':
+        startDegree+=180
+    elif direction == 'SW' or direction == 'W':
+        startDegree += 270
+    else:
+        startDegree = (startDegree + 90*random.randint(0,4))%360
+
+    h = mileage/4
+    bearingInterval = 90
+    
+    #TODO: randomise rectanglism and therefore the h
+    rectanglish = random.uniform(-mileage/5, mileage/5)
+    dist = h
+    for x in range(4):
+        if (x == 0 and len(direction) == 1):
+            dist = h/2
+        else:
+            if x%2 == 1:
+                dist = h + rectanglish
+            else:
+                dist = h - rectanglish
+        
+        coords = geopy.distance.distance(dist).destination(geopy.Point(lastLat,lastLon), bearing=(startDegree)%360)
+
+        try:
+            latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 400, list)
+            checkpoints.append([latitude, longitude, newid])
+            startDegree+=(bearingInterval)
+            lastLat = latitude
+            lastLon = longitude
+        except Exception as e:
+            print("Error: ", e)
+            print(traceback.print_exc())
+
+        if len(direction) == 2 and x==3:
+            break
+    checkpoints.append([lat,lon,id])
+    return checkpoints
+
 #TODO:new process implemented here, break the length into at least 4 sections, once it is 4 miles, go mile by mile as each section
 #before we use the algorithm, we are going to break the route into n segments for an n length route
 def findCheckPoints(mileage, direction, lat, lon, id, list):
@@ -484,7 +484,7 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
             if x != mileage - 1:
                 coords = geopy.distance.distance(miles=mileage/4).destination(geopy.Point(lastLat,lastLon), bearing=(bearingDegree+genRand)%360)
                 try:
-                    print(coords)
+                    start = time.now()
                     latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 400, list)
                     checkpoints.append([latitude, longitude, newid])
                     bearingDegree+=(bearingInterval + genRand)
@@ -512,7 +512,6 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
                     start = time()
                     latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 1609, list)
                     end = time() - start
-                    #print(end)
                     checkpoints.append([latitude, longitude, newid])
                     bearingDegree+=(bearingInterval+genRand)
                     lastLat = latitude
@@ -531,6 +530,7 @@ def generateDataForOutput(adjList, coordArray):
             orig = coordArray[str(node)]
             curNeighbor = coordArray[str(neighbor[0])]
             G.add_node(str(node), pos=(orig['lon'], orig['lat']))
+ 
             G.add_node(str(curNeighbor['id']), pos=(curNeighbor['lon'], curNeighbor['lat']))
             G.add_edge(str(node), str(curNeighbor['id']), weight=neighbor[1])
     
@@ -578,3 +578,16 @@ def mergeMidNodesForPath(path, adjList, wayList):
                 print("Error: ", e)
     return newPath
             
+def xTaxiCabHeuristic(G, c, g):
+    pc = G.nodes[c]['pos']
+    pg = G.nodes[g]['pos']
+    (x1, y1) = pc
+    (x2, y2) = pg
+
+    return abs(y1 - y2) + abs(x1 - x2)
+
+def xLinearDistanceHeuristic(c, g):
+    (x1, y1) = c
+    (x2, y2) = g
+
+    return sqrt((y1-y2)**2 + (x2-x1)**2)

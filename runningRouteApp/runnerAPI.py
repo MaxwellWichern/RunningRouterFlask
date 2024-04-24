@@ -1,3 +1,4 @@
+import os
 from flask import request, jsonify
 import requests
 import json
@@ -14,6 +15,7 @@ import geopy as gp
 from itertools import pairwise
 import traceback
 import matplotlib.pyplot as plt
+from multiprocessing import Manager, Process, Queue
 
 
 
@@ -175,8 +177,10 @@ def bundlePythonResults():
     newNeeded = False
     exisitingList = {}
     startid=0
+    print(data)
     lat = data["lat"]
     lon = data["lon"]
+
     #2 check if we need to create a new adjacency list
     #2.1 if the request is not provided with an email, the user is not logged in, skip this because we need to save data with an email
     if data["email"]:
@@ -190,7 +194,7 @@ def bundlePythonResults():
         else: 
             print("new needed: no list yet")
             newNeeded = True
-        
+      
     #3.1 if we need a new list get data from overpass using #1
     if newNeeded:
         try:
@@ -199,9 +203,7 @@ def bundlePythonResults():
             print("Error:", e)
             print("Failed to query Overpass")
             return e
-        listSize = 0
-        for node in result["elements"]:
-            if node["type"] == "node": listSize+=1
+
         try:
             orderedResult = OrderedDict(result)
         except Exception as e:
@@ -210,60 +212,107 @@ def bundlePythonResults():
             return result
         
         #3.2 create the adjacency list and corresponding coordinate array which has latitude and longitude
-        adjList, coordArray, wayList = rt.endpointList(orderedResult)
+        print("Creating Adjacency List")
+        adjList, coordArray = rt.endpointList(orderedResult)
 
         lat, lon, startid = rt.findCheckStart(lat, lon, 1600, adjList)
         #3.3 add the new adjacency list to mongo, replacing the old list and add the TTL date for the element
         try:
             if not data["email"]:
                 print("Mongo Query: Add")
-                rdb.addAdjList(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize, startid, wayList, data["direction"])
+                rdb.addAdjList(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, startid, data["direction"])
             else:
                 print("Mongo Query: update full")
-                rdb.updateAdjListFull(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, listSize, startid, wayList, data["direction"])
+                rdb.updateAdjListFull(data["email"], adjList, [lat, lon], float(data["mileage"])/2.0, coordArray, startid, data["direction"])
         except Exception as e:
             print("Error adding Element, check the form data")
             print(e)
 
-    if (existingList):
-        coordArray = existingList["coordArray"]
-        listSize = existingList["numNodes"]
+    if (not newNeeded):
+        coordArray = json.loads(existingList["coordArray"])
         startid = existingList["startid"]
-        wayList = existingList["wayList"]
 
 
-    #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
-    checkpoints = rt.findCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
-    print("",file=open('output.txt', 'w'))
-    for check in checkpoints:
-        print('{},{},red,square,"Pune"'.format(check[0], check[1]),file=open('output.txt', 'a'))
-    print("\n\n\n\n\n\n",file=open('output.txt', 'a'))
-    totalPath = []
-    totalLength = 0
-    print("Starting routing algorithm")
+    routes = []
+    parallelDist = []    
+    processes = []
+    Q = Manager().Queue()
+    for x in range(0, 5):
+        newP = Process(target=findRoutes, args=(Q,data, lat, lon, startid, adjList, coordArray))
+        newP.start()
+        processes.append(newP)
 
-    G = rt.generateDataForOutput(adjList, coordArray)
-    
-    fig, ax = plt.subplots(figsize=(9, 7))
-    plt.subplots_adjust(bottom=0.1, right=2, top=0.9, left=0.1)
-    nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=False, node_size=2)
-    plt.show()
-    try:
-        for coord, coord2 in pairwise(checkpoints):
-            path = nx.astar_path(G, str(coord[2]), str(coord2[2]), weight='weight')
-            totalPath+=path
-            totalLength+=nx.astar_path_length(G, str(coord[2]), str(coord2[2]), weight='weight')
-    except Exception as exc:
-        print("Error: ", exc)
-        print("Checkpoints failed, no path found")
-        return traceback.print_exc()
+    for process in processes:
+        process.join()
+
+    counter = 0
+    while not Q.empty():
+        result = Q.get()
+        #if len(result[0]) != 0:
+        routes.append(result[0])
+        parallelDist.append(result[1])
+
 
     #5 return routes
-    coordListPath = [{"route":[]}]
+    coordListPath = []
     print("",file=open('output.txt', 'w'))
-    for nodeId in totalPath:
-        coordListPath[0]["route"].append([coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]])
-        print('{},{},red,square,"Pune"'.format(coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]), file=open('output.txt', 'a'))
-    return jsonify({"coordinates": coordListPath, "length": totalLength})
+    counter = 0
+    for route in routes:
+        coordListPath.append({"route":[]})
+        for nodeId in route[0]:
+            coordListPath[counter]["route"].append([coordArray[str(nodeId)]["lon"],coordArray[str(nodeId)]["lat"]])
+            print('{},{},red,square,"Pune"'.format(coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]), file=open('output.txt', 'a'))
+        counter+=1
+        print('\n\nNew Route\n\n', file=open('output.txt', 'a'))
+    return jsonify({"coordinates": coordListPath, "length": parallelDist})
 
 
+def findRoutes(Q, data, lat, lon, startid, adjList, coordArray):
+    TOL = 1
+    distance = 0
+    totalPath = []
+    routes = []
+    parallelDist = []
+    numRoutes = 0
+    numAttempts = 10
+    while (abs(distance-int(data["mileage"])) > TOL and numRoutes < numAttempts) or (numRoutes < numAttempts and int(data["mileage"]) == 1):
+        #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
+        distance = 0
+        if int(data["mileage"]) < 4: #Square
+            checkpoints = rt.rectCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
+        else : #circular
+            checkpoints = rt.findCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
+        try:
+            G = rt.generateDataForOutput(adjList, coordArray)
+            fig, ax = plt.subplots(figsize=(9, 7))
+            plt.subplots_adjust(bottom=0.1, right=2, top=0.9, left=0.1)
+            nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=False, node_size=2)
+            #plt.show()
+
+            print("",file=open('output.txt', 'w'))
+            for check in checkpoints:
+                print('{},{},red,square,"Pune"'.format(check[0], check[1]),file=open('output.txt', 'a'))
+            print("\n\n\n\n\n\n",file=open('output.txt', 'a'))
+            try:
+                for coord, coord2 in pairwise(checkpoints):
+                    
+                    path = nx.astar_path(G, str(coord[2]), str(coord2[2]), heuristic=lambda c, g: rt.xTaxiCabHeuristic(G, c, g) ,weight='weight')
+                    
+                    totalPath+=path
+                    distance+=nx.astar_path_length(G, str(coord[2]), str(coord2[2]), heuristic=lambda c, g: rt.xTaxiCabHeuristic(G, c, g), weight='weight')
+
+                if abs(distance-int(data["mileage"])) < TOL or (numRoutes == numAttempts-1 and len(routes) == 0):
+                    routes.append(totalPath)
+                    parallelDist.append(distance)
+                totalPath = []            
+                numRoutes+=1        
+            except Exception as exc:
+                print("Error: ", exc)
+                print("Checkpoints failed, no path found")
+                print(traceback.print_exc())
+            
+        except Exception as e:
+            print("Error: ", e)
+            print("Coordinate List Issue")
+    
+    Q.put((routes, parallelDist))

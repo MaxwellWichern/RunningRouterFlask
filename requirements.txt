@@ -11,5 +11,7 @@ requests
 opencv-python
 flask-cors
 geopy
-bson
-Flask-PyMongo
+pymongo
+networkx
+matplotlib
+flask_pymongo

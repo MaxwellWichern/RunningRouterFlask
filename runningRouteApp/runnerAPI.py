@@ -177,7 +177,7 @@ def bundlePythonResults():
     newNeeded = False
     exisitingList = {}
     startid=0
-    print(data)
+
     lat = data["lat"]
     lon = data["lon"]
 
@@ -255,15 +255,15 @@ def bundlePythonResults():
 
     #5 return routes
     coordListPath = []
-    print("",file=open('output.txt', 'w'))
+    #print("",file=open('output.txt', 'w'))
     counter = 0
     for route in routes:
         coordListPath.append({"route":[]})
         for nodeId in route[0]:
             coordListPath[counter]["route"].append([coordArray[str(nodeId)]["lon"],coordArray[str(nodeId)]["lat"]])
-            print('{},{},red,square,"Pune"'.format(coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]), file=open('output.txt', 'a'))
+            #print('{},{},red,square,"Pune"'.format(coordArray[str(nodeId)]["lat"],coordArray[str(nodeId)]["lon"]), file=open('output.txt', 'a'))
         counter+=1
-        print('\n\nNew Route\n\n', file=open('output.txt', 'a'))
+        #print('\n\nNew Route\n\n', file=open('output.txt', 'a'))
     return jsonify({"coordinates": coordListPath, "length": parallelDist})
 
 
@@ -289,10 +289,10 @@ def findRoutes(Q, data, lat, lon, startid, adjList, coordArray):
             nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=False, node_size=2)
             #plt.show()
 
-            print("",file=open('output.txt', 'w'))
-            for check in checkpoints:
-                print('{},{},red,square,"Pune"'.format(check[0], check[1]),file=open('output.txt', 'a'))
-            print("\n\n\n\n\n\n",file=open('output.txt', 'a'))
+            #print("",file=open('output.txt', 'w'))
+            #for check in checkpoints:
+                #print('{},{},red,square,"Pune"'.format(check[0], check[1]),file=open('output.txt', 'a'))
+            #print("\n\n\n\n\n\n",file=open('output.txt', 'a'))
             try:
                 for coord, coord2 in pairwise(checkpoints):
                     

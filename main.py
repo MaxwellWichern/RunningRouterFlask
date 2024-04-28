@@ -7,5 +7,5 @@ config.read('pymongo_ini')
 
 if __name__ == "__main__":
     app = create_app()
-    app.config['DEBUG'] = True
+    #app.config['DEBUG'] = True
     app.run()

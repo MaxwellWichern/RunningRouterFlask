@@ -12,7 +12,7 @@ from itertools import pairwise
 import networkx as nx
 import matplotlib.pyplot as plt
 import traceback
-
+import ast
 
 
 #This function fixes the bounding box around the start location to help limit the number of nodes as well as add a neat utility to the user
@@ -406,7 +406,12 @@ def validateExistingList(data, existingList):
             newNeeded = True
         #2.5 update the TTL/date for the list
         else:
+            #print("", file=open("db.txt", 'w'))
+            #print(f"{existingList["list"]}\n\n", file=open("db.txt", 'a'))
             adjList = json.loads(existingList["list"])
+            #print(f"{adjList}\n\n", file=open("db.txt", 'a'))
+            #print(f"{adjList}\n\n", file=open("db.txt", 'a'))
+
             print("Mongo Query: update TTL")
             updateAdjListTTL(data["email"])    
         return newNeeded, lat, lon, adjList
@@ -525,14 +530,14 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
 
 def generateDataForOutput(adjList, coordArray):
     G = nx.Graph()
-    for node in adjList:
-        for neighbor in adjList[str(node)]:
-            orig = coordArray[str(node)]
+    for node1 in adjList:
+        for neighbor in adjList[str(node1)]:    
+            orig = coordArray[str(node1)]
             curNeighbor = coordArray[str(neighbor[0])]
-            G.add_node(str(node), pos=(orig['lon'], orig['lat']))
+            G.add_node(str(node1), pos=(orig['lon'], orig['lat']))
  
             G.add_node(str(curNeighbor['id']), pos=(curNeighbor['lon'], curNeighbor['lat']))
-            G.add_edge(str(node), str(curNeighbor['id']), weight=neighbor[1])
+            G.add_edge(str(node1), str(curNeighbor['id']), weight=neighbor[1])
     
     return G
 

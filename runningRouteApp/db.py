@@ -38,7 +38,7 @@ def addAdjList(email, list, center, radius, coordArray, startid, direction):
     if currList:
         print("Duplicate Email")
         return False
-    newList = {"email": email,"list": dumps(list), 
+    newList = {"email": email, "list": dumps(list), 
                "createdAt": datetime.now(timezone.utc), 
                "center": center, 
                "radius": radius, 
@@ -61,12 +61,18 @@ def updateAdjListFull(email, list, center, radius, coordArray, startid,  directi
     try:
         listSize = sys.getsizeof(list)
         numExtraInfo = int(ceil(listSize / 100000))
-        list = dumps(list)
+        #print(numExtraInfo)
+        #print(f"{list}\n\n", file=open("db.txt", 'a'))
+        list = dumps(list)        
+        #print(f"{list}\n\n", file=open("db.txt", 'a'))
+
+        """
         newList = []
         if (numExtraInfo > 1):
             newList = [ list[i:i+int(listSize/numExtraInfo)] for i in range(0, numExtraInfo, int(listSize/numExtraInfo)) ]
-            print(len(newList))
+            #print(len(newList))
             list = dumps(newList[0])
+        """
             
         response = db.adjacencyLists.update_one(
             {"email": email},
@@ -79,7 +85,7 @@ def updateAdjListFull(email, list, center, radius, coordArray, startid,  directi
                       "direction": direction}},
             upsert = True
         )
-
+        """
         if (numExtraInfo > 1):
             for index, element in enumerate(newList[1:]):
                 responseExtra = db.extraInfo.update_one(
@@ -93,7 +99,7 @@ def updateAdjListFull(email, list, center, radius, coordArray, startid,  directi
                         }
                     },
                     upsert = True
-                )
+                )"""
         return response
     except Exception as e:
         print("Error: ", e)

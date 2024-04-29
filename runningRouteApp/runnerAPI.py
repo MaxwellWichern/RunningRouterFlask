@@ -284,9 +284,9 @@ def findRoutes(Q, data, lat, lon, startid, adjList, coordArray):
             checkpoints = rt.findCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
         try:
             G = rt.generateDataForOutput(adjList, coordArray)
-            fig, ax = plt.subplots(figsize=(9, 7))
-            plt.subplots_adjust(bottom=0.1, right=2, top=0.9, left=0.1)
-            nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=False, node_size=2)
+            #fig, ax = plt.subplots(figsize=(9, 7))
+            #plt.subplots_adjust(bottom=0.1, right=2, top=0.9, left=0.1)
+            #nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=False, node_size=2)
             #plt.show()
 
             #print("",file=open('output.txt', 'w'))

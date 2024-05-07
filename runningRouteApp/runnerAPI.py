@@ -177,6 +177,7 @@ def bundlePythonResults():
     newNeeded = False
     exisitingList = {}
     startid=0
+
     lat = data["lat"]
     lon = data["lon"]
 
@@ -190,6 +191,8 @@ def bundlePythonResults():
             if tempList: 
                 adjList = tempList
                 print("list reset")
+            else:
+                print(tempList)
         else: 
             print("new needed: no list yet")
             newNeeded = True
@@ -197,7 +200,7 @@ def bundlePythonResults():
     #3.1 if we need a new list get data from overpass using #1
     if newNeeded:
         try:
-            result, lat, lon, startid = rt.overpassQuery(data['mileage'], lat, lon, data['direction'])
+            result, lat, lon, startid = rt.overpassQuery(data['mileage'], lat, lon, data["direction"], data["roadOptions"])
         except Exception as e:
             print("Error:", e)
             print("Failed to query Overpass")
@@ -276,6 +279,7 @@ def findRoutes(Q, data, lat, lon, startid, adjList, coordArray):
     numAttempts = 10
     while (abs(distance-int(data["mileage"])) > TOL and numRoutes < numAttempts) or (numRoutes < numAttempts and int(data["mileage"]) == 1):
         #4 find one route for now, but I would like maybe 4-5 per user request (send to algorithm in this step)
+        numRoutes+=1
         distance = 0
         if int(data["mileage"]) < 4: #Square
             checkpoints = rt.rectCheckPoints(int(data["mileage"]), data['direction'], lat, lon, startid, adjList)
@@ -304,7 +308,7 @@ def findRoutes(Q, data, lat, lon, startid, adjList, coordArray):
                     routes.append(totalPath)
                     parallelDist.append(distance)
                 totalPath = []            
-                numRoutes+=1        
+                 
             except Exception as exc:
                 print("Error: ", exc)
                 print("Checkpoints failed, no path found")

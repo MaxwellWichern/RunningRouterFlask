@@ -125,7 +125,7 @@ def findCheckStart(lat, lon, mileage, list = None):
                         minNode = node
         meters *= 2
 
-    if minNode is None: return False
+    if minNode is None: return False, False, False
     return minNode["lat"], minNode["lon"] , minNode["id"]
         
 
@@ -135,7 +135,7 @@ def findCheckStart(lat, lon, mileage, list = None):
 #lon: longitude
 #direction: direction is of the form North, East, South, West, North-East, North-West, South-East, South-West
 #-----------This is used to limit the bounding box in the query to help prevent excess data
-def overpassQuery(mileage, lat, lon, direction):
+def overpassQuery(mileage, lat, lon, direction, roadOption):
     #find the start location
     radius = 1609.344 * float(mileage)/2.0
     try:
@@ -149,18 +149,32 @@ def overpassQuery(mileage, lat, lon, direction):
     print("Fix bounding box")
     coordsForBBox = fixBoundingBox(None, float(lat), float(lon), float(mileage)/2)
     bboxString = '[bbox: {}, {}, {}, {}]'.format(coordsForBBox["minLat"],coordsForBBox["minLon"], coordsForBBox["maxLat"], coordsForBBox["maxLon"])
-    query = '''
-        [out:json]{3};
-        (
-            way(around: {0}, {1}, {2})["highway"="residential"];
+    ways = ''
+    if "Streets" in roadOption or roadOption == '[]':
+        ways += '''way(around: {0}, {1}, {2})["highway"="residential"];
             way(around: {0}, {1}, {2})["highway"="secondary"];
             way(around: {0}, {1}, {2})["highway"="tertiary"];
             way(around: {0}, {1}, {2})["highway"="unclassified"];
-            way(around: {0}, {1}, {2})["highway"="primary"];
+            way(around:{0}, {1}, {2})["highway" = "service"];
+            '''.format(radius, float(lat), float(lon))
+    if "Highways" in roadOption:
+        ways += 'way(around: {0}, {1}, {2})["highway"="primary"];'.format(radius, float(lat), float(lon))
+
+    if "Walkways" in roadOption:
+        ways += '''way(around: {0}, {1}, {2})["highway" = "footway"];
+          	way(around: {0}, {1}, {2})["highway" = "cycleway"];
+            way(around: {0}, {1}, {2})["surface" = "dirt"];
+            way(around: {0}, {1}, {2})["surface" = "unpaved"];
+            '''.format(radius, float(lat), float(lon))
+        
+    query = '''
+        [out:json]{1};
+        (
+            {0}
         );
         (._;>;);
         out body;
-    '''.format(radius, float(lat), float(lon), bboxString)
+    '''.format(ways, bboxString)
     overPass_url = "https://overpass-api.de/api/interpreter"
     query_params = {"data": query}
     #This is the actual query using the data above
@@ -176,154 +190,6 @@ def overpassQuery(mileage, lat, lon, direction):
         sleep(1)
     #print(json.dumps(result, indent=2))
     return result, lat, lon, startid
-
-
-#Create an adjacency list from the given object/dict received from the overpass query
-#orderedDict: The dictionary recieved with the nodes and the ways from overpass
-#num: the number of workers/processes being created
-def optimizeForAdjListMulti(orderedDict, num):
-    adjList = multiprocessing.Manager().dict()
-    coordArray = multiprocessing.Manager().list()
-    sp = multiprocessing.Manager().Semaphore(1)
-    dictToList = orderedDict["elements"]
-    wayList = []
-    nodeList = []
-    for element in dictToList:
-        if element["type"] == 'node':
-            nodeList.append(element)
-        else:
-            wayList.append(element)
-    
-    interval_size = int(len(wayList)/num)
-    
-    processes = []
-    for x in range(0, num):
-        newP = Process(target=multiProcessTwo, args=(wayList[x * interval_size: (x+1)* interval_size], nodeList, coordArray, adjList, sp))
-        newP.start()
-        processes.append(newP)
-
-    for process in processes:
-        process.join()
-
-
-    return dict(adjList), list(coordArray)
-
-#the target process in the multiprocessing, this will create the adjacency list
-#waylist: The list of ways from the overpass query
-#nodelist: the list of nodes from the overpass query
-#coordArray: The coordinate array will house all the nodes only once with the lats and lons
-#------------The index of each element is used to navigate the adjacency List
-#adjList: The adjacency list being created, the first element is the coordinate location in the coord array
-#---------and the second is the list of adjacencies in the form of coordArray index, weight
-def multiProcessTwo(wayList, nodeList, coordArray, adjList, sp):
-     #go through every way
-    localAdjList = dict()
-    for element in wayList:
-        roadType = element["tags"]["highway"]
-        previousNode = -1
-        #go through every node inside the way
-        for node in element["nodes"]:
-            #search for the actual node corresponding to the id of the 'node' variable above
-            for el in nodeList:
-                #if the type is not node, it is a way, just skip out. It is an arbitrary spot usually roughly half, where it switches
-                #but it is not set in stone at any one time
-                if el["type"] != "node": break
-                if el["id"] == node:
-                    newNode = True
-                    #if the node is new, add a new element to the dict and add an adjacency from previous to it and it to previous
-                    sp.acquire()
-                    try:
-                        if node not in adjList:  
-                            #print(node)          
-                            coordArray.append(el)
-                            #the first element will be its location in coordArray
-                            adjList[node] = [len(coordArray)-1]
-                        
-                        else: newNode = False
-                        #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
-                        if previousNode != -1:
-                            lat1 = coordArray[adjList[node][0]]['lat']
-                            lon1 = coordArray[adjList[node][0]]['lon']
-                            lat2 = coordArray[previousNode]['lat']
-                            lon2 = coordArray[previousNode]['lon']
-                            #in miles
-                            distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
-                            #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
-                            adjList[node].append([coordArray[previousNode]["id"], distanceToNode])
-                            idOfLast = coordArray[previousNode]["id"]
-                            adjList[idOfLast].append([el["id"],distanceToNode])
-                    except:
-                        print("Error adding adjacencies:")
-                        print(el)
-                        print(coordArray[len(coordArray)-1])
-                    finally:
-                        sp.release()
-                    
-                    #if this was a new node
-                    if newNode:
-                        previousNode = len(coordArray)-1
-                    #otherwise we want it to be the node at the old location
-                    else:
-                        previousNode = adjList[node][0]
-                    break
-
-#The threadless implementation of converting data to an adjacency list
-#Threadless was chosen due to python's GIL and the overhead due to multiprocessing
-#multiprocessing has the potential to be used when finding multiple routes because they
-#will not have to share resources between processes
-#orderedDict: This is the dictionary provided by overpass
-#-------------I only care about the ["elements"], in which the format of those is
-#-------------a list of nodes with coordinates followed by a list of ways which house a list of nodeIds, 
-#-------------searchable only from the above nodes
-def createAdjListThreadless(orderedDict):
-    adjList = dict()
-    coordArray = dict()
-    dictToList = orderedDict["elements"]
-
-    #go through every way
-    for element in reversed(dictToList):
-        if element["type"] == "node": break
-        previousNode = -1
-        #go through every node inside the way
-        for index, node in enumerate(element["nodes"]):
-            #if index % 3 == 0:
-                #search for the actual node corresponding to the id of the 'node' variable above
-                for el in dictToList:
-                    #if the type is not node, it is a way, just skip out. It is an arbitrary spot usually roughly half, where it switches
-                    #but it is not set in stone at any one time
-                    if el["type"] != "node": break
-                    if el["id"] == node:
-                        newNode = True
-                        #if the node is new, add a new element to the dict and add an adjacency from previous to it and it to previous
-                        if node not in adjList:  
-                            #print(node)          
-                            coordArray.append(el)
-                            #the first element will be its location in coordArray
-                            adjList[str(node)] = [len(coordArray)-1]
-                        
-                        else: newNode = False
-                        #Get the distance to become the weight for the edge of the adjacency (option to switch to km?)
-                        if previousNode != -1:
-                            lat1 = coordArray[adjList[str(node)][0]]['lat']
-                            lon1 = coordArray[adjList[str(node)][0]]['lon']
-                            lat2 = coordArray[previousNode]['lat']
-                            lon2 = coordArray[previousNode]['lon']
-                            #in miles
-                            distanceToNode = int(geopy.distance.distance((lat1, lon1), (lat2, lon2)).miles * 100000) / 100000
-                            #if the node is in the dict/adjList, we won't add it, but we will have to add the previous node as an adjacent and v.v.
-                            adjList[str(node)].append([str(coordArray[previousNode]["id"]), distanceToNode])
-                            idOfLast = coordArray[previousNode]["id"]
-                            adjList[str(idOfLast)].append([str(el["id"]),distanceToNode])
-                    
-                        #if this was a new node
-                        if newNode:
-                            previousNode = len(coordArray)-1
-                        #otherwise we want it to be the node at the old location
-                        else:
-                            previousNode = adjList[str(node)][0]
-                        break
-
-    return adjList, coordArray
 
 #given the cumbersome data to process, I am going to limit ways to their endpoints and insert the midpoints when constructing the path
 #I will still have to loop through like before, including checking if a node is in the list already in order to add it, but the issue to overcome
@@ -448,13 +314,16 @@ def rectCheckPoints(mileage, direction, lat, lon, id, list):
                 dist = h - rectanglish
         
         coords = geopy.distance.distance(dist).destination(geopy.Point(lastLat,lastLon), bearing=(startDegree)%360)
-
+ 
         try:
             latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 400, list)
-            checkpoints.append([latitude, longitude, newid])
-            startDegree+=(bearingInterval)
-            lastLat = latitude
-            lastLon = longitude
+            if latitude != False:
+                checkpoints.append([latitude, longitude, newid])
+                startDegree+=(bearingInterval)
+                lastLat = latitude
+                lastLon = longitude
+            else: 
+                print("No checkpoint near this location")
         except Exception as e:
             print("Error: ", e)
             print(traceback.print_exc())
@@ -464,8 +333,6 @@ def rectCheckPoints(mileage, direction, lat, lon, id, list):
     checkpoints.append([lat,lon,id])
     return checkpoints
 
-#TODO:new process implemented here, break the length into at least 4 sections, once it is 4 miles, go mile by mile as each section
-#before we use the algorithm, we are going to break the route into n segments for an n length route
 def findCheckPoints(mileage, direction, lat, lon, id, list):
     checkpoints = []
     checkpoints.append([lat,lon,id])
@@ -491,10 +358,13 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
                 try:
                     start = time.now()
                     latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 400, list)
-                    checkpoints.append([latitude, longitude, newid])
-                    bearingDegree+=(bearingInterval + genRand)
-                    lastLat = latitude
-                    lastLon = longitude
+                    if latitude != False:
+                        checkpoints.append([latitude, longitude, newid])
+                        bearingDegree+=(bearingInterval + genRand)
+                        lastLat = latitude
+                        lastLon = longitude
+                    else: 
+                        print("No node in viscinity")
                 except Exception as e:
                     print("Error: ", e)
                     print("None returned when finding point, may not exist")
@@ -516,11 +386,14 @@ def findCheckPoints(mileage, direction, lat, lon, id, list):
                 try:
                     start = time()
                     latitude, longitude, newid = findCheckStart(coords.latitude, coords.longitude, 1609, list)
-                    end = time() - start
-                    checkpoints.append([latitude, longitude, newid])
-                    bearingDegree+=(bearingInterval+genRand)
-                    lastLat = latitude
-                    lastLon = longitude
+                    if latitude != False:
+                        end = time() - start
+                        checkpoints.append([latitude, longitude, newid])
+                        bearingDegree+=(bearingInterval+genRand)
+                        lastLat = latitude
+                        lastLon = longitude
+                    else: 
+                        print("No node in viscinity")
                 except Exception as e:
                     print("Error: ", e)
                     print("None returned when finding point, may not exist")
@@ -540,48 +413,6 @@ def generateDataForOutput(adjList, coordArray):
             G.add_edge(str(node1), str(curNeighbor['id']), weight=neighbor[1])
     
     return G
-
-# when the path is determined at the end, the nodes need to be re added because they were separated and pruned.
-# This will allow a smooth curve when drawing the actual path
-# path: The old path
-# adjList: the adjacency list for which to search for pairwise path elements connections
-# wayList: the list of ways housing the mid nodes
-def mergeMidNodesForPath(path, adjList, wayList):
-    newPath = []
-    for first, second in pairwise(path):
-        first = str(first)
-        second = str(second)
-        if first != second:
-            firstNode = adjList[first]
-            way = ""
-            for adjacencies in firstNode:
-                if second == str(adjacencies[0]):
-                    way = str(adjacencies[2])
-                    break
-            startAdding = False
-            try: 
-                for node in wayList[str(way)]:
-                    node = str(node)
-                    if node == first:
-                        startAdding=True
-                    elif startAdding:
-                        newPath.append(node)
-                        if node == second:
-                            break
-                    elif node == second:
-                        for reversedNode in reversed(wayList[way]):
-                            if reversedNode == second:
-                                startAdding = True
-                            elif startAdding:
-                                newPath.append(reversedNode)
-                            elif reversedNode == first:
-                                newPath.append(reversedNode)
-                                break
-                        break
-            except Exception as e:
-                print("Empty way")
-                print("Error: ", e)
-    return newPath
             
 def xTaxiCabHeuristic(G, c, g):
     pc = G.nodes[c]['pos']
